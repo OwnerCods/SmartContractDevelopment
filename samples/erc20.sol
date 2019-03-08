@@ -130,6 +130,8 @@ contract EAToken is owned {
     // This generates a public event for frozen (blacklisting) accounts
     event FrozenFunds(address target, bool frozen);
 
+    // This is for token swap
+    event TokenSwap(address indexed user, uint256 value);
 
 
     /*======================================
