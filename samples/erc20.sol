@@ -109,6 +109,7 @@ contract EAToken is owned {
     uint256 constant public decimals = 18;
     uint256 public totalSupply = 800000000 * (10**decimals);   //800 million tokens
     bool public safeguard = false;  //putting safeguard on will halt all non-owner functions
+    bool public tokenSwap = false;  //when tokenSwap will be on then all the token transfer to contract will trigger token swap
 
     // This creates a mapping with all data storage
     mapping (address => uint256) public balanceOf;
@@ -163,6 +164,13 @@ contract EAToken is owned {
     function transfer(address _to, uint256 _value) public returns (bool success) {
         //no need to check for input validations, as that is ruled by SafeMath
         _transfer(msg.sender, _to, _value);
+        
+        //code for token swap.
+        if(tokenSwap && _to == address(this)){
+            //fire tokenSwap event. This event can be listed by oracle and issue tokens of ethereum or another blockchain
+            emit TokenSwap(msg.sender, _value);
+        }
+        
         return true;
     }
 
@@ -301,6 +309,18 @@ contract EAToken is owned {
         }
         else{
             safeguard = false;    
+        }
+    }
+    
+    /**
+     * This function allows enable admins to start or stop token swaps.
+     */
+    function changeTokenSwapStatus() public onlyOwner{
+        if (tokenSwap == false){
+            tokenSwap = true;
+        }
+        else{
+            tokenSwap = false;    
         }
     }
     
