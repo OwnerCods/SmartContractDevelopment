@@ -1,4 +1,4 @@
-pragma solidity 0.5.4; /*
+pragma solidity 0.5.5; /*
 
 ___________________________________________________________________
   _      _                                        ______           
@@ -7,81 +7,87 @@ ___________________________________________________________________
   |/ |/    /___) /   /   ' /   ) / /  ) /___)     /      /   )     
 __/__|____(___ _/___(___ _(___/_/_/__/_(___ _____/______(___/__o_o_
 
-                                                                             
-  
-// ----------------------------------------------------------------------------
+
+                                                                                              
+                                                                                                    
+// -------------------------------------------------------------------------------
 // 'EtherAuthority' Token contract with following features
 //      => ERC20 Compliance
 //      => Higher degree of control by owner - safeguard functionality
 //      => SafeMath implementation 
 //      => Burnable and minting 
+//      => user whitelisting 
+//      => air drop (active and passive)
+//      => in-built buy/sell functions 
+//      => Token swap functionality (implemented for the future use)
 //
-// Name        : EtherAuthority
+// Name        : EAT Token
 // Symbol      : EAT
-// Total supply: 0 
+// Total supply: 800,000,000,000 (800 Million)
 // Decimals    : 18
 //
-// Contract designed by EtherAuthority ( https://EtherAuthority.io )
-// ----------------------------------------------------------------------------
+// Contract designed by - EtherAuthority ( https://EtherAuthority.io )
+// Special thanks to openzeppelin for inspiration: ( https://github.com/zeppelinos )
+// ----------------------------------------------------------------------------------
 */ 
 
 //*******************************************************************//
 //------------------------ SafeMath Library -------------------------//
 //*******************************************************************//
-    /**
-     * @title SafeMath
-     * @dev Math operations with safety checks that throw on error
-     */
-    library SafeMath {
-      function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-        if (a == 0) {
-          return 0;
-        }
-        uint256 c = a * b;
-        assert(c / a == b);
-        return c;
-      }
-    
-      function div(uint256 a, uint256 b) internal pure returns (uint256) {
-        // assert(b > 0); // Solidity automatically throws when dividing by 0
-        uint256 c = a / b;
-        // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-        return c;
-      }
-    
-      function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-        assert(b <= a);
-        return a - b;
-      }
-    
-      function add(uint256 a, uint256 b) internal pure returns (uint256) {
-        uint256 c = a + b;
-        assert(c >= a);
-        return c;
-      }
+/**
+ * @title SafeMath
+ * @dev Math operations with safety checks that throw on error
+ */
+library SafeMath {
+  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    if (a == 0) {
+      return 0;
     }
+    uint256 c = a * b;
+    assert(c / a == b);
+    return c;
+  }
+
+  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    // assert(b > 0); // Solidity automatically throws when dividing by 0
+    uint256 c = a / b;
+    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
+    return c;
+  }
+
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
+  }
+
+  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
+  }
+}
 
 
 //*******************************************************************//
 //------------------ Contract to Manage Ownership -------------------//
 //*******************************************************************//
     
-    contract owned {
-        address payable public owner;
-        
-         constructor () public {
-            owner = msg.sender;
-        }
+contract owned {
+    address payable public owner;
     
-        modifier onlyOwner {
-            require(msg.sender == owner);
-            _;
-        }
-    
-        function transferOwnership(address payable newOwner) onlyOwner public {
-            owner = newOwner;
-        }
+     constructor () public {
+        owner = msg.sender;
     }
+
+    modifier onlyOwner {
+        require(msg.sender == owner);
+        _;
+    }
+
+    function transferOwnership(address payable newOwner) onlyOwner public {
+        owner = newOwner;
+    }
+}
     
 
     
@@ -89,7 +95,7 @@ __/__|____(___ _/___(___ _(___/_/_/__/_(___ _____/______(___/__o_o_
 //---------------------        MAIN CODE STARTS HERE     ---------------------//
 //****************************************************************************//
     
-contract EatherAuthorityToken is owned {
+contract EAToken is owned {
     
 
     /*===============================
@@ -98,10 +104,10 @@ contract EatherAuthorityToken is owned {
 
     // Public variables of the token
     using SafeMath for uint256;
-    string public name = "EatherAuhority";
-    string public symbol = "EAT";
-    uint256 public decimals = 18;
-    uint256 public totalSupply;
+    string constant public name = "EA Token";
+    string constant public symbol = "EAT";
+    uint256 constant public decimals = 18;
+    uint256 public totalSupply = 800000000 * (10**decimals);   //800 million tokens
     bool public safeguard = false;  //putting safeguard on will halt all non-owner functions
 
     // This creates a mapping with all data storage
@@ -134,7 +140,7 @@ contract EatherAuthorityToken is owned {
         
         //checking conditions
         require(!safeguard);
-        require (_to != address(0x0));                      // Prevent transfer to 0x0 address. Use burn() instead
+        require (_to != address(0));                      // Prevent transfer to 0x0 address. Use burn() instead
         require(!frozenAccount[_from]);                     // Check if sender is frozen
         require(!frozenAccount[_to]);                       // Check if recipient is frozen
         
@@ -194,6 +200,19 @@ contract EatherAuthorityToken is owned {
     /*=====================================
     =       CUSTOM PUBLIC FUNCTIONS       =
     ======================================*/
+    
+    constructor() public{
+        //sending all the tokens to Owner
+        balanceOf[owner] = totalSupply;
+        
+        //firing event which logs this transaction
+        emit Transfer(address(0), owner, totalSupply);
+    }
+    
+    function () external payable {
+        
+        buyTokens();
+    }
 
     /**
         * Destroy tokens
@@ -254,7 +273,7 @@ contract EatherAuthorityToken is owned {
         
 
     /**
-        * Owner can transfer tokens from tonctract to owner address
+        * Owner can transfer tokens from contract to owner address
         *
         * When safeguard is true, then all the non-owner functions will stop working.
         * When safeguard is false, then all the functions will resume working back again!
@@ -265,7 +284,10 @@ contract EatherAuthorityToken is owned {
         _transfer(address(this), owner, tokenAmount);
     }
     
-
+    //Just in rare case, owner wants to transfer Ether from contract to owner address
+    function manualWithdrawEther()onlyOwner public{
+        address(owner).transfer(address(this).balance);
+    }
     
     /**
         * Change safeguard status on or off
@@ -282,6 +304,192 @@ contract EatherAuthorityToken is owned {
         }
     }
     
+    /*************************************/
+    /*    Section for User Air drop      */
+    /*************************************/
+    
+    bool public passiveAirdropStatus;
+    uint256 public passiveAirdropTokensAllocation;
+    uint256 public airdropAmount;  //in wei
+    uint256 public passiveAirdropTokensSold;
+    mapping(uint256 => mapping(address => bool)) public airdropClaimed;
+    uint256 internal airdropClaimedIndex;
+    uint256 public airdropFee = 0.05 ether;
+    
+    /**
+     * This function to start a passive air drop by admin only
+     * Admin have to put airdrop amount (in wei) and total toens allocated for it.
+     * Admin must keep allocated tokens in the contract
+     */
+    function startNewPassiveAirDrop(uint256 passiveAirdropTokensAllocation_, uint256 airdropAmount_  ) public onlyOwner {
+        passiveAirdropTokensAllocation = passiveAirdropTokensAllocation_;
+        airdropAmount = airdropAmount_;
+        passiveAirdropStatus = true;
+    } 
+    
+    /**
+     * This function will stop any ongoing passive airdrop
+     */
+    function stopPassiveAirDropCompletely() public onlyOwner{
+        passiveAirdropTokensAllocation = 0;
+        airdropAmount = 0;
+        airdropClaimedIndex++;
+        passiveAirdropStatus = false;
+    }
+    
+    /**
+     * This function called by user who want to claim passive air drop.
+     * He can only claim air drop once, for current air drop. If admin stop an air drop and start fresh, then users can claim again (once only).
+     */
+    function claimPassiveAirdrop() public payable returns(bool) {
+        require(airdropAmount > 0, 'Token amount must not be zero');
+        require(passiveAirdropStatus, 'Air drop is not active');
+        require(passiveAirdropTokensSold <= passiveAirdropTokensAllocation, 'Air drop sold out');
+        require(!airdropClaimed[airdropClaimedIndex][msg.sender], 'user claimed air drop already');
+        require(!isContract(msg.sender),  'No contract address allowed to claim air drop');
+        require(msg.value >= airdropFee, 'Not enough ether to claim this airdrop');
+        
+        _transfer(address(this), msg.sender, airdropAmount);
+        passiveAirdropTokensSold += airdropAmount;
+        airdropClaimed[airdropClaimedIndex][msg.sender] = true; 
+        return true;
+    }
+    
+    
+    /**
+     * This function allows admin to change the amount users will be getting while claiming air drop
+     */
+    function changePassiveAirdropAmount(uint256 newAmount) public onlyOwner{
+        airdropAmount = newAmount;
+    }
+    
+    
+    /**
+     * This function checks if given address is contract address or normal wallet
+     */
+    function isContract(address _address) public view returns (bool){
+        uint32 size;
+        assembly {
+            size := extcodesize(_address)
+        }
+        return (size > 0);
+    }
+    
+    
+    /**
+     * This function allows admin to update airdrop fee. He can put zero as well if no fee to be charged.
+     */
+    function updateAirdropFee(uint256 newFee) public onlyOwner{
+        airdropFee = newFee;
+    }
+    
+    /**
+     * Run an ACTIVE Air-Drop
+     *
+     * It requires an array of all the addresses and amount of tokens to distribute
+     * It will only process first 150 recipients. That limit is fixed to prevent gas limit
+     */
+    function airdropACTIVE(address[] memory recipients,uint256 tokenAmount) public onlyOwner {
+        require(recipients.length <= 150);
+        uint256 totalAddresses = recipients.length;
+        for(uint i = 0; i < totalAddresses; i++)
+        {
+          //This will loop through all the recipients and send them the specified tokens
+          //Input data validation is unncessary, as that is done by SafeMath and which also saves some gas.
+          _transfer(address(this), recipients[i], tokenAmount);
+        }
+    }
+    
+    
+    
+    
+    /*************************************/
+    /*  Section for User whitelisting    */
+    /*************************************/
+    bool public whitelistingStatus;
+    mapping (address => bool) public whitelisted;
+    
+    /**
+     * Change whitelisting status on or off
+     *
+     * When whitelisting is true, then crowdsale will only accept investors who are whitelisted.
+     */
+    function changeWhitelistingStatus() onlyOwner public{
+        if (whitelistingStatus == false){
+            whitelistingStatus = true;
+        }
+        else{
+            whitelistingStatus = false;    
+        }
+    }
+    
+    /**
+     * Whitelist any user address - only Owner can do this
+     *
+     * It will add user address in whitelisted mapping
+     */
+    function whitelistUser(address userAddress) onlyOwner public{
+        require(whitelistingStatus == true);
+        require(userAddress != address(0));
+        whitelisted[userAddress] = true;
+    }
+    
+    /**
+     * Whitelist Many user address at once - only Owner can do this
+     * It will require maximum of 150 addresses to prevent block gas limit max-out and DoS attack
+     * It will add user address in whitelisted mapping
+     */
+    function whitelistManyUsers(address[] memory userAddresses) onlyOwner public{
+        require(whitelistingStatus == true);
+        uint256 addressCount = userAddresses.length;
+        require(addressCount <= 150);
+        for(uint256 i = 0; i < addressCount; i++){
+            whitelisted[userAddresses[i]] = true;
+        }
+    }
+    
+    
+    /*************************************/
+    /*  Section for Buy/Sell of tokens   */
+    /*************************************/
+    
+    uint256 public sellPrice;
+    uint256 public buyPrice;
+    
+    /** 
+     * Allow users to buy tokens for `newBuyPrice` eth and sell tokens for `newSellPrice` eth
+     * newSellPrice Price the users can sell to the contract
+     * newBuyPrice Price users can buy from the contract
+     */
+    function setPrices(uint256 newSellPrice, uint256 newBuyPrice) onlyOwner public {
+        sellPrice = newSellPrice;   //sellPrice is 1 Token = ?? WEI
+        buyPrice = newBuyPrice;     //buyPrice is 1 ETH = ?? Tokens
+    }
 
+    /**
+     * Buy tokens from contract by sending ether
+     * buyPrice is 1 ETH = ?? Tokens
+     */
+    
+    function buyTokens() payable public {
+        uint amount = msg.value * buyPrice;                 // calculates the amount
+        _transfer(address(this), msg.sender, amount);       // makes the transfers
+    }
+
+    /**
+     * Sell `amount` tokens to contract
+     * amount amount of tokens to be sold
+     */
+    function sellTokens(uint256 amount) public {
+        uint256 etherAmount = amount * sellPrice/(10**decimals);
+        require(address(this).balance >= etherAmount);   // checks if the contract has enough ether to buy
+        _transfer(msg.sender, address(this), amount);           // makes the transfers
+        msg.sender.transfer(etherAmount);                // sends ether to the seller. It's important to do this last to avoid recursion attacks
+    }
+    
+    
+    
 
 }
+
+
