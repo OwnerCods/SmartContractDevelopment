@@ -214,6 +214,7 @@ contract EAToken is owned {
         */
     function approve(address _spender, uint256 _value) public returns (bool success) {
         require(!safeguard);
+        require(balanceOf[msg.sender] >= _value, "Balance does not have enough tokens");
         allowance[msg.sender][_spender] = _value;
         return true;
     }
