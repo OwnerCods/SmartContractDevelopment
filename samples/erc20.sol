@@ -1,4 +1,4 @@
-pragma solidity 0.5.5; /*
+pragma solidity 0.5.9; /*
 
 ___________________________________________________________________
   _      _                                        ______           
@@ -74,8 +74,8 @@ library SafeMath {
 //*******************************************************************//
     
 contract owned {
-    address public owner;
-    address internal newOwner;
+    address payable public owner;
+    address payable internal newOwner;
 
     event OwnershipTransferred(address indexed _from, address indexed _to);
 
@@ -88,7 +88,7 @@ contract owned {
         _;
     }
 
-    function transferOwnership(address _newOwner) public onlyOwner {
+    function transferOwnership(address payable _newOwner) public onlyOwner {
         newOwner = _newOwner;
     }
 
@@ -526,5 +526,4 @@ contract EAToken is owned {
     
 
 }
-
 
