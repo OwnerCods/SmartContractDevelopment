@@ -31,40 +31,41 @@ __/__|____(___ _/___(___ _(___/_/_/__/_(___ _____/______(___/__o_o_
 // ----------------------------------------------------------------------------------
 */ 
 
+
 //*******************************************************************//
 //------------------------ SafeMath Library -------------------------//
 //*******************************************************************//
 /**
- * @title SafeMath
- * @dev Math operations with safety checks that throw on error
- */
+    * @title SafeMath
+    * @dev Math operations with safety checks that throw on error
+    */
 library SafeMath {
-  function mul(uint256 a, uint256 b) internal pure returns (uint256) {
+    function mul(uint256 a, uint256 b) internal pure returns (uint256) {
     if (a == 0) {
-      return 0;
+        return 0;
     }
     uint256 c = a * b;
-    assert(c / a == b);
+    require(c / a == b, 'SafeMath mul failed');
     return c;
-  }
+    }
 
-  function div(uint256 a, uint256 b) internal pure returns (uint256) {
+    function div(uint256 a, uint256 b) internal pure returns (uint256) {
     // assert(b > 0); // Solidity automatically throws when dividing by 0
     uint256 c = a / b;
     // assert(a == b * c + a % b); // There is no case in which this doesn't hold
     return c;
-  }
+    }
 
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    assert(b <= a);
+    function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    require(b <= a, 'SafeMath sub failed');
     return a - b;
-  }
+    }
 
-  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    function add(uint256 a, uint256 b) internal pure returns (uint256) {
     uint256 c = a + b;
-    assert(c >= a);
+    require(c >= a, 'SafeMath add failed');
     return c;
-  }
+    }
 }
 
 
@@ -73,9 +74,12 @@ library SafeMath {
 //*******************************************************************//
     
 contract owned {
-    address payable public owner;
-    
-     constructor () public {
+    address public owner;
+    address internal newOwner;
+
+    event OwnershipTransferred(address indexed _from, address indexed _to);
+
+    constructor() public {
         owner = msg.sender;
     }
 
@@ -84,11 +88,19 @@ contract owned {
         _;
     }
 
-    function transferOwnership(address payable newOwner) onlyOwner public {
+    function transferOwnership(address _newOwner) public onlyOwner {
+        newOwner = _newOwner;
+    }
+
+    //this flow is to prevent transferring ownership to wrong wallet by mistake
+    function acceptOwnership() public {
+        require(msg.sender == newOwner);
+        emit OwnershipTransferred(owner, newOwner);
         owner = newOwner;
+        newOwner = address(0);
     }
 }
-    
+ 
 
     
 //****************************************************************************//
