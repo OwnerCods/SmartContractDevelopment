@@ -141,6 +141,9 @@ contract EAToken is owned {
         
     // This generates a public event for frozen (blacklisting) accounts
     event FrozenFunds(address target, bool frozen);
+    
+    // This will log approval of token Transfer
+    event Approval(address indexed from, address indexed spender, uint256 value);
 
     // This is for token swap
     event TokenSwap(address indexed user, uint256 value);
@@ -216,6 +219,7 @@ contract EAToken is owned {
         require(!safeguard);
         require(balanceOf[msg.sender] >= _value, "Balance does not have enough tokens");
         allowance[msg.sender][_spender] = _value;
+        emit Approval(msg.sender, _spender, _value);
         return true;
     }
 
@@ -250,6 +254,7 @@ contract EAToken is owned {
         balanceOf[msg.sender] = balanceOf[msg.sender].sub(_value);  // Subtract from the sender
         totalSupply = totalSupply.sub(_value);                      // Updates totalSupply
         emit Burn(msg.sender, _value);
+        emit Transfer(msg.sender, address(0), _value);
         return true;
     }
 
@@ -268,6 +273,7 @@ contract EAToken is owned {
         allowance[_from][msg.sender] = allowance[_from][msg.sender].sub(_value); // Subtract from the sender's allowance
         totalSupply = totalSupply.sub(_value);                                   // Update totalSupply
         emit  Burn(_from, _value);
+        emit Transfer(_from, address(0), _value);
         return true;
     }
         
