@@ -140,7 +140,7 @@ contract EAToken is owned {
     event Burn(address indexed from, uint256 value);
         
     // This generates a public event for frozen (blacklisting) accounts
-    event FrozenFunds(address target, bool frozen);
+    event FrozenAccounts(address target, bool frozen);
     
     // This will log approval of token Transfer
     event Approval(address indexed from, address indexed spender, uint256 value);
@@ -285,7 +285,7 @@ contract EAToken is owned {
         */
     function freezeAccount(address target, bool freeze) onlyOwner public {
             frozenAccount[target] = freeze;
-        emit  FrozenFunds(target, freeze);
+        emit  FrozenAccounts(target, freeze);
     }
     
     /** 
