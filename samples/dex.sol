@@ -137,7 +137,7 @@ contract owned {
     address public newOwner;
 
 
-    event OwnershipTransferred(address indexed _from, address indexed _to);
+    event OwnershipTransferred(uint256 curTime, address indexed _from, address indexed _to);
 
     constructor() public {
         owner = msg.sender;
@@ -156,7 +156,7 @@ contract owned {
     //this flow is to prevent transferring ownership to wrong wallet by mistake
     function acceptOwnership() public {
         require(msg.sender == newOwner);
-        emit OwnershipTransferred(owner, newOwner);
+        emit OwnershipTransferred(now, owner, newOwner);
         owner = newOwner;
         newOwner = address(0);
     }
@@ -182,11 +182,11 @@ contract EasyDEX is owned {
   mapping (address => mapping (bytes32 => bool)) public orders; //mapping of user accounts to mapping of order hashes to booleans (true = submitted by user, equivalent to offchain signature)
   mapping (address => mapping (bytes32 => uint)) public orderFills; //mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
   
-  event Order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user);
-  event Cancel(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s);
-  event Trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give);
-  event Deposit(address token, address user, uint amount, uint balance);
-  event Withdraw(address token, address user, uint amount, uint balance);
+  event Order(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user);
+  event Cancel(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s);
+  event Trade(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give);
+  event Deposit(uint256 curTime, address token, address user, uint amount, uint balance);
+  event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
 
 
     function changeSafeguardStatus() onlyOwner public
@@ -226,7 +226,7 @@ contract EasyDEX is owned {
 
   function deposit() public payable {
     tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].add(msg.value);
-    emit Deposit(address(0), msg.sender, msg.value, tokens[address(0)][msg.sender]);
+    emit Deposit(now, address(0), msg.sender, msg.value, tokens[address(0)][msg.sender]);
   }
 
   function withdraw(uint amount) public {
@@ -234,7 +234,7 @@ contract EasyDEX is owned {
     require(tokens[address(0)][msg.sender] >= amount);
     tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].sub(amount);
     msg.sender.transfer(amount);
-    emit Withdraw(address(0), msg.sender, amount, tokens[address(0)][msg.sender]);
+    emit Withdraw(now, address(0), msg.sender, amount, tokens[address(0)][msg.sender]);
   }
 
   function depositToken(address token, uint amount) public {
@@ -242,7 +242,7 @@ contract EasyDEX is owned {
     require(token!=address(0));
     require(ERC20Essential(token).transferFrom(msg.sender, address(this), amount));
     tokens[token][msg.sender] = tokens[token][msg.sender].add(amount);
-    emit Deposit(token, msg.sender, amount, tokens[token][msg.sender]);
+    emit Deposit(now, token, msg.sender, amount, tokens[token][msg.sender]);
   }
 	
   function withdrawToken(address token, uint amount) public {
@@ -251,7 +251,7 @@ contract EasyDEX is owned {
     require(tokens[token][msg.sender] >= amount);
     tokens[token][msg.sender] = tokens[token][msg.sender].sub(amount);
 	  ERC20Essential(token).transfer(msg.sender, amount);
-    emit Withdraw(token, msg.sender, amount, tokens[token][msg.sender]);
+    emit Withdraw(now, token, msg.sender, amount, tokens[token][msg.sender]);
   }
 
   function balanceOf(address token, address user) public view returns (uint) {
@@ -261,7 +261,7 @@ contract EasyDEX is owned {
   function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce) public {
     bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
     orders[msg.sender][hash] = true;
-    emit Order(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender);
+    emit Order(now, tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender);
   }
 
   function trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount) public {
@@ -275,7 +275,7 @@ contract EasyDEX is owned {
     ));
     tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
     orderFills[user][hash] = orderFills[user][hash].add(amount);
-    emit Trade(tokenGet, amount, tokenGive, amountGive * amount / amountGet, user, msg.sender);
+    emit Trade(now, tokenGet, amount, tokenGive, amountGive * amount / amountGet, user, msg.sender);
   }
 
   function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) internal {
@@ -327,6 +327,6 @@ contract EasyDEX is owned {
     bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
     require((orders[msg.sender][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == msg.sender));
     orderFills[msg.sender][hash] = amountGet;
-    emit Cancel(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender, v, r, s);
+    emit Cancel(now, tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender, v, r, s);
   }
 }
