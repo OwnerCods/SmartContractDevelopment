@@ -1,4 +1,4 @@
-    pragma solidity 0.5.10;  
+ pragma solidity 0.5.10;  
 
 
   /*  
@@ -201,6 +201,16 @@ contract EasyDEX is owned {
         }
     }
 
+    //Calculate percent and return result
+    function calculatePercentage(uint256 PercentOf, uint256 percentTo ) internal pure returns (uint256) 
+    {
+        uint256 factor = 10000;
+        require(percentTo <= factor);
+        uint256 c = PercentOf.mul(percentTo).div(factor);
+        return c;
+    }  
+
+
   function firstSet(address feeAccount_, address accountLevelsAddr_, uint tradingFee_) public onlyOwner {
     feeAccount = feeAccount_;
     accountLevelsAddr = accountLevelsAddr_;
@@ -280,7 +290,7 @@ contract EasyDEX is owned {
 
   function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) internal {
     
-    uint tradingFeeXfer = amount.mul(tradingFee) / (1 ether);
+    uint tradingFeeXfer = calculatePercentage(amount,tradingFee);
     /*if (accountLevelsAddr != 0x0) {
       uint accountLevel = AccountLevels(accountLevelsAddr).accountLevel(user);
       if (accountLevel==1) feeRebateXfer = amount.mul(feeRebate) / (1 ether);
