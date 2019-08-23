@@ -1,4 +1,4 @@
- pragma solidity 0.5.10;  
+ pragma solidity 0.5.11;  
 
 
   /*  
@@ -173,11 +173,11 @@ interface ERC20Essential
 
 contract EasyDEX is owned {
   using SafeMath for uint256;
-  bool public safeGuard = true ; // To hault all non owner functions in case of imergency
+  bool public safeGuard; // To hault all non owner functions in case of imergency - by default false
   address public admin; //the admin address
   address public feeAccount; //the account that will receive fees
-  address public accountLevelsAddr; //the address of the AccountLevels contract
-  uint public tradingFee; //percentage times (1 ether)
+  uint public tradingFee = 50; // 50 = 0.5%
+  
   mapping (address => mapping (address => uint)) public tokens; //mapping of token addresses to mapping of account balances (token=0 means Ether)
   mapping (address => mapping (bytes32 => bool)) public orders; //mapping of user accounts to mapping of order hashes to booleans (true = submitted by user, equivalent to offchain signature)
   mapping (address => mapping (bytes32 => uint)) public orderFills; //mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
@@ -188,6 +188,11 @@ contract EasyDEX is owned {
   event Deposit(uint256 curTime, address token, address user, uint amount, uint balance);
   event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
 
+
+
+    constructor() public {
+        feeAccount = msg.sender;
+    }
 
     function changeSafeguardStatus() onlyOwner public
     {
@@ -211,19 +216,11 @@ contract EasyDEX is owned {
     }  
 
 
-  function firstSet(address feeAccount_, address accountLevelsAddr_, uint tradingFee_) public onlyOwner {
-    feeAccount = feeAccount_;
-    accountLevelsAddr = accountLevelsAddr_;
-    tradingFee = tradingFee_;
-    safeGuard = false;
-  }
+
     
   // contract without fallback automatically reject incoming ether
   // function() external {  }
 
-  function changeAccountLevelsAddr(address accountLevelsAddr_) public onlyOwner {
-    accountLevelsAddr = accountLevelsAddr_;
-  }
 
   function changeFeeAccount(address feeAccount_) public onlyOwner {
     feeAccount = feeAccount_;
