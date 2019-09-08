@@ -1,4 +1,4 @@
-pragma solidity 0.5.9; /*
+pragma solidity 0.5.11; /*
 
 ___________________________________________________________________
   _      _                                        ______           
@@ -8,28 +8,39 @@ ___________________________________________________________________
 __/__|____(___ _/___(___ _(___/_/_/__/_(___ _____/______(___/__o_o_
 
 
-                                                                                              
-                                                                                                    
-// -------------------------------------------------------------------------------
-// 'EtherAuthority' Token contract with following features
-//      => ERC20 Compliance
-//      => Higher degree of control by owner - safeguard functionality
-//      => SafeMath implementation 
-//      => Burnable and minting 
-//      => user whitelisting 
-//      => air drop (active and passive)
-//      => in-built buy/sell functions 
-//      => Token swap functionality (implemented for the future use)
-//
-// Name        : EAT Token
-// Symbol      : EAT
-// Total supply: 800,000,000,000 (800 Million)
-// Decimals    : 18
-//
-// Contract designed by - EtherAuthority ( https://EtherAuthority.io )
-// Special thanks to openzeppelin for inspiration: ( https://github.com/zeppelinos )
-// ----------------------------------------------------------------------------------
+
+
+
+=== 'EtherAuthority' Token contract with following features ===
+    => ERC20 Compliance
+    => Higher degree of control by owner - safeguard functionality
+    => SafeMath implementation 
+    => Burnable and minting 
+    => user whitelisting 
+    => air drop (active and passive)
+    => in-built buy/sell functions 
+    => Token swap functionality (implemented for the future use)
+
+
+======================= Quick Stats ===================
+    => Name        : EAT Token
+    => Symbol      : EAT
+    => Total supply: 800,000,000,000 (800 Million)
+    => Decimals    : 18
+
+
+============= Independant Audit of the code ============
+    => Multiple Freelancers Auditors
+    => Community Audit by Bug Bounty program
+
+
+-------------------------------------------------------------------
+ Copyright (c) 2019 onwards EtherAuthority Inc. ( https://EtherAuthority.io )
+ Contract designed with ❤ by EtherAuthority ( https://EtherAuthority.io )
+-------------------------------------------------------------------
 */ 
+
+
 
 
 //*******************************************************************//
