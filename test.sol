@@ -35,7 +35,7 @@ contract Sahson {
 	addItems("Beam-0-19", 4040, 3250, 0);
 	addItems("Beam-1-1", 4210, 3400, 0);
 	addItems("Beam-1-2", 4380, 3550, 0);
-	addItems("Beam-1-3", 4550, 3700, 0);
+	addItems("Beam-1-3", 4550, 3700, 0); 
 	addItems("Beam-1-4", 4720, 3850, 0);
 	addItems("Beam-1-5", 4890, 4000, 0);
 	addItems("Beam-1-6", 5060, 4150, 0);
