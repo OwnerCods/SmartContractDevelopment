@@ -11,7 +11,7 @@ contract Sahson {
  string public disapproveReason;
  
  
- constructor() public {
+ function Sahson() public {
     disapproveReason = "";
 
 	addItems("Beam-0-1", 980, 550, 0);
@@ -394,9 +394,9 @@ contract Sahson {
      uint256 p_amountMC, 
      uint256 p_amountSC1, 
      uint256 p_amountSC2, 
-     address payable p_AddressMC, 
-     address payable p_AddressSC1, 
-     address payable p_AddressSC2,
+     address  p_AddressMC, 
+     address  p_AddressSC1, 
+     address  p_AddressSC2,
      bytes32[] memory p_itemsToApprove
  )
  public payable
