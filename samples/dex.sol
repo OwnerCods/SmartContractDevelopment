@@ -230,6 +230,23 @@ contract EasyDEX is owned {
     //require(tradingFee_ <= tradingFee);
     tradingFee = tradingFee_;
   }
+  
+  function availableTradingFeeOwner() public view returns(uint256){
+      //it only holds ether as fee
+      return tokens[address(0)][feeAccount];
+  }
+  
+  function withdrawTradingFeeOwner() public onlyOwner returns (string memory){
+      uint256 amount = availableTradingFeeOwner();
+      require (amount > 0, 'Nothing to withdraw');
+      
+      tokens[address(0)][feeAccount] = 0;
+      
+      msg.sender.transfer(amount);
+      
+      emit OwnerWithdrawTradingFee(owner, amount);
+      
+  }
 
   function deposit() public payable {
     tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].add(msg.value);
