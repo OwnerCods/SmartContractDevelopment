@@ -25,7 +25,7 @@
                                                                                      
                                                                                      
 ------------------------------------------------------------------------------------------------------
- Copyright (c) 2019 Easy DEX Inc. ( https://xxxxxxxx.io )
+ Copyright (c) 2019 Onwards Easy DEX Inc. ( https://xxxxxxxx.io )
  Contract designed with ❤ by EtherAuthority  ( https://EtherAuthority.io )
 ------------------------------------------------------------------------------------------------------
 */
@@ -174,7 +174,6 @@ interface ERC20Essential
 contract EasyDEX is owned {
   using SafeMath for uint256;
   bool public safeGuard; // To hault all non owner functions in case of imergency - by default false
-  address public admin; //the admin address
   address public feeAccount; //the account that will receive fees
   uint public tradingFee = 50; // 50 = 0.5%
   
