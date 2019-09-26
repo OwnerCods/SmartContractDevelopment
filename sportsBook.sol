@@ -797,7 +797,7 @@ contract Sportsbook is owned
 	using SafeMath for uint256;
 	using strings for *;
 
-    uint256 public voucherRakeStatus = 2;
+    uint256 public voucherRakeStatus = 2; // is it need here ? 
     // 0: only main bet
     // 1: only side bet
     // 2: both main bet and side bet
@@ -861,9 +861,12 @@ contract Sportsbook is owned
 	address public agent;
 
 	// Trontopia stuff
-	address public topiaTokenContractAddress;
-	address public voucherContractAddress;
- 
+    address public topiaTokenContractAddress;
+    address public dividendContractAddress;
+    address public voucherContractAddress;
+    address public vaultContractAddress;
+    address public diamondContractAddress;
+    address public refPoolContractAddress;
 
 	mapping(uint256 => Bet) bets;
 
@@ -877,11 +880,23 @@ contract Sportsbook is owned
 		agent = newAgent;
 	}
 
-	function updateContractAddresses(address topiaContract, address voucherContract) public onlyOwner {
-		topiaTokenContractAddress = topiaContract;
-		voucherContractAddress = voucherContract;
+    
+    /**
+        Function allows owner to update the Topia contract address
+    */
+    function updateContractAddresses(address topiaContract, address voucherContract, address dividendContract, address refPoolContract, address vaultContract, address diamondContract) public onlyOwner returns(string)
+    {
+        
+        topiaTokenContractAddress = topiaContract;
+        voucherContractAddress = voucherContract;
+        dividendContractAddress = dividendContract;
+        refPoolContractAddress = refPoolContract;
+        vaultContractAddress = vaultContract;
+        diamondContractAddress = diamondContract;
 
-	}
+        return "done";
+    }
+
 
 	function updateMinimumBetAmount(uint256 newMinimum) public onlyOwner {
 		minimumBetAmountSUN = newMinimum;
@@ -1204,7 +1219,46 @@ contract Sportsbook is owned
         return mainRake + tempRake;
         
     }
-  
+
+
+    
+    function getAvailableVaultRake() public view returns (uint256){
+        uint256 mainRake;
+        if(mainRakePoolDepositedAllTime > vaultRakeWithdrawn ){
+            uint256 totalRake = mainRakePoolDepositedAllTime - vaultRakeWithdrawn;
+            mainRake = totalRake * vaultRakePercent / 100;
+        }
+        uint256 tempRake = tempRakePool * vaultRakePercent / 100;
+        
+        return mainRake + tempRake;
+        
+    }
+    
+    function getAvailableDiamondRake() public view returns (uint256){
+        uint256 mainRake;
+        if(mainRakePoolDepositedAllTime > diamondRakeWithdrawn ){
+            uint256 totalRake = mainRakePoolDepositedAllTime - diamondRakeWithdrawn;
+            mainRake = totalRake * diamondRakePercent / 100;
+        }
+        uint256 tempRake = tempRakePool * diamondRakePercent / 100;
+        
+        return mainRake + tempRake;
+        
+    }
+
+    function getAvailableDivRake() public view returns (uint256){
+        uint256 mainRake;
+        if(mainRakePoolDepositedAllTime > divRakeWithdrawn ){
+            uint256 totalRake = mainRakePoolDepositedAllTime - divRakeWithdrawn;
+            mainRake = totalRake * divRakePercent / 100;
+        }
+        uint256 tempRake = tempRakePool * divRakePercent / 100;
+        
+        return mainRake + tempRake;
+        
+    }
+    
+     
 
     
     function withdrawOwnerPool() external onlyOwner returns (string)
@@ -1230,16 +1284,21 @@ contract Sportsbook is owned
         return "Nothing to withdraw";
     }
 
-      
-    function updateRakePercents(uint256 _ownerRakePercent, uint256 _voucherRakePercent) external onlyOwner returns (string)
+
+
+
+
+    
+    function updateRakePercents(uint256 _ownerRakePercent, uint256 _voucherRakePercent, uint256 _vaultRakePercent, uint256 _diamondRakePercent, uint256 _divRakePercent) external onlyOwner returns (string)
     {
-        require(_ownerRakePercent <= 100 && _voucherRakePercent <= 100 , 'Invalid amount' );
+        require(_ownerRakePercent <= 100 && _voucherRakePercent <= 100 && _vaultRakePercent <= 100 && _diamondRakePercent <= 100, 'Invalid amount' );
         ownerRakePercent = _ownerRakePercent;
         voucherRakePercent = _voucherRakePercent;
+        vaultRakePercent = _vaultRakePercent;
+        diamondRakePercent = _diamondRakePercent;
+        divRakePercent = _divRakePercent;
         return "All rake percents updated successfully";
     }
-
-
      
     function updateGlobalRakePerMillion(uint256 newGlobalRakePerMillion) external onlyOwner returns (string){
         require(newGlobalRakePerMillion < 1000000, 'Invalid amount');
@@ -1273,6 +1332,93 @@ contract Sportsbook is owned
         
         return true;
     }
+
+   /**
+     * This function can be called by vault contract to request payment of vaultRakePool
+     */
+    function requestVaultRakePayment() public returns(bool){
+        
+        require(msg.sender == vaultContractAddress, 'Unauthorised caller');
+        
+        //first transfer any outstanding rake from temp to main rake pool
+        addRakeToMainPool();
+        
+        if(mainRakePoolDepositedAllTime > vaultRakeWithdrawn ){
+            uint256 totalRake = mainRakePoolDepositedAllTime - vaultRakeWithdrawn;
+            
+            //taking % of that
+            uint256 finalRake = totalRake * vaultRakePercent / 100;
+            mainRakePool = mainRakePool.sub(finalRake);
+            vaultRakeWithdrawn = mainRakePoolDepositedAllTime;
+            
+            //transferring rake amount
+            msg.sender.transfer(finalRake);
+            
+        }
+        
+        return true;
+    }
+
+
+    /**
+     * This function can be called by diamond contract to request payment of diamondRakePool
+     */
+    function requestDiamondRakePayment() public returns(bool){
+        
+        require(msg.sender == diamondContractAddress, 'Unauthorised caller');
+        
+        //first transfer any outstanding rake from temp to main rake pool
+        addRakeToMainPool();
+        
+        if(mainRakePoolDepositedAllTime > diamondRakeWithdrawn ){
+            uint256 totalRake = mainRakePoolDepositedAllTime - diamondRakeWithdrawn;
+            
+            //taking % of that
+            uint256 finalRake = totalRake * diamondRakePercent / 100;
+            mainRakePool = mainRakePool.sub(finalRake);
+            diamondRakeWithdrawn = mainRakePoolDepositedAllTime;
+            
+            //transferring rake amount
+            msg.sender.transfer(finalRake);
+            
+        }
+        
+        return true;
+    }
+
+
+    /**
+     * This function can be called by dividend contract to request payment of divRakePool
+     */
+    function requestDivRakePayment(uint256 requestedAmount) public returns(bool){
+        
+        require(msg.sender == dividendContractAddress, 'Unauthorised caller');
+        
+        //first transfer any outstanding rake from temp to main rake pool
+        addRakeToMainPool();
+        
+        if(mainRakePoolDepositedAllTime > divRakeWithdrawn ){
+            uint256 totalRake = mainRakePoolDepositedAllTime - divRakeWithdrawn;
+            
+            //taking % of that
+            uint256 finalRake = totalRake * divRakePercent / 100;
+
+            //if requestedAmount is higher than available finalRake, then it will simply return false as... 
+            //we want to return false because it will break loop in dividend contract 
+            //because there is no normal case, when requestedAmount would be higher than finalRake
+            if(finalRake < requestedAmount) {return false;}
+
+            mainRakePool = mainRakePool.sub(requestedAmount);
+            divRakeWithdrawn = mainRakePoolDepositedAllTime - ((finalRake - requestedAmount) * (100 / divRakePercent) );
+            
+            //transferring rake amount
+            msg.sender.transfer(requestedAmount);
+            
+        }
+        
+        return true;
+    }
+    
 
 
 
