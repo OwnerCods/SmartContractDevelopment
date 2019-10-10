@@ -131,8 +131,9 @@ contract EAToken is owned {
     string constant public symbol = "EAT";
     uint256 constant public decimals = 18;
     uint256 public totalSupply = 800000000 * (10**decimals);   //800 million tokens
-    bool public safeguard = false;  //putting safeguard on will halt all non-owner functions
-    bool public tokenSwap = false;  //when tokenSwap will be on then all the token transfer to contract will trigger token swap
+    uint256 constant public maxSupply = 500000000 * (10**decimals);   //500 million tokens
+    bool public safeguard;  //putting safeguard on will halt all non-owner functions
+    bool public tokenSwap;  //when tokenSwap will be on then all the token transfer to contract will trigger token swap
 
     // This creates a mapping with all data storage
     mapping (address => uint256) public balanceOf;
@@ -212,7 +213,7 @@ contract EAToken is owned {
         * @param _value the amount to send
         */
     function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
-        require(_value <= allowance[_from][msg.sender]);     // Check allowance
+        //checking of allowance and token value is done by SafeMath
         allowance[_from][msg.sender] = allowance[_from][msg.sender].sub(_value);
         _transfer(_from, _to, _value);
         return true;
@@ -248,8 +249,7 @@ contract EAToken is owned {
     }
     
     function () external payable {
-        
-        buyTokens();
+      buyTokens();
     }
 
     /**
@@ -305,6 +305,7 @@ contract EAToken is owned {
         * @param mintedAmount the amount of tokens it will receive
         */
     function mintToken(address target, uint256 mintedAmount) onlyOwner public {
+        require(totalSupply.add(mintedAmount) <= maxSupply, "Cannot Mint more than maximum supply");
         balanceOf[target] = balanceOf[target].add(mintedAmount);
         totalSupply = totalSupply.add(mintedAmount);
         emit Transfer(address(0), target, mintedAmount);
@@ -441,14 +442,14 @@ contract EAToken is owned {
      * It requires an array of all the addresses and amount of tokens to distribute
      * It will only process first 150 recipients. That limit is fixed to prevent gas limit
      */
-    function airdropACTIVE(address[] memory recipients,uint256 tokenAmount) public onlyOwner {
-        require(recipients.length <= 150);
+    function airdropACTIVE(address[] memory recipients,uint256[] memory tokenAmount) public onlyOwner {
         uint256 totalAddresses = recipients.length;
+        require(totalAddresses <= 150,"Too many recipients");
         for(uint i = 0; i < totalAddresses; i++)
         {
           //This will loop through all the recipients and send them the specified tokens
           //Input data validation is unncessary, as that is done by SafeMath and which also saves some gas.
-          _transfer(address(this), recipients[i], tokenAmount);
+          _transfer(address(this), recipients[i], tokenAmount[i]);
         }
     }
     
@@ -494,7 +495,7 @@ contract EAToken is owned {
     function whitelistManyUsers(address[] memory userAddresses) onlyOwner public{
         require(whitelistingStatus == true);
         uint256 addressCount = userAddresses.length;
-        require(addressCount <= 150);
+        require(addressCount <= 150,"Too many addresses");
         for(uint256 i = 0; i < addressCount; i++){
             whitelisted[userAddresses[i]] = true;
         }
