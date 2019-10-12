@@ -141,7 +141,7 @@ contract TRONtopia_Referral_Pool is owned{
     uint256 public refPool;             //this will get 1% of the div distribution to pay for the referrers.
     address[] public whitelistCallerArray;
     bool public globalHalt; //when this variabe will be true, it will stop main functionality!
-
+    uint256 public refPercent;  // percent to calculate referal bonous
 
 
 
@@ -172,7 +172,10 @@ contract TRONtopia_Referral_Pool is owned{
         refPool += msg.value;
     }
 
-
+    function setrefPercent(uint256 _refPercent) onlyOwner public returns (bool)
+    {
+        refPercent = _refPercent;
+    }
 
     /** 
         * Add whitelist address who can call Mint function. Usually, they are other games contract
@@ -286,7 +289,7 @@ contract TRONtopia_Referral_Pool is owned{
         //calculate final referrer bonus, considering its tiers: bronze - siver - gold
         //final ref bonus = total winning * ref bonus percentage according to tiers / 100
         //the reason to put 100000, which is three extra zeros, is because we multiplied with 1000 while calculating ref bonus percetange
-        uint256 _finalRefBonus = _etherAmount / 100000;
+        uint256 _finalRefBonus =  _etherAmount * refPercent / 100 * 1000000000;
 
         referrerBonusBalance[referrers[_user]] += _finalRefBonus;
         if(referrer != address(0)) referralsWageredAllTime[referrer] += _etherAmount;
@@ -309,7 +312,8 @@ contract TRONtopia_Referral_Pool is owned{
         //calculate final referrer bonus, considering its tiers: bronze - siver - gold
         //final ref bonus = total winning * ref bonus percentage according to tiers / 100
         //the reason to put 100000, which is three extra zeros, is because we multiplied with 1000 while calculating ref bonus percetange
-        uint256 _finalRefBonus = _etherAmount  / 100000;
+
+        uint256 _finalRefBonus = _etherAmount * refPercent / 100 * 1000000000;
   
         referrers[_user] = _referrer;
         referrerBonusBalance[_referrer] += _finalRefBonus;
