@@ -157,7 +157,7 @@ contract TRONtopia_Referral_Pool is owned{
 
 
     // Events to track ether transfer to referrers
-    event ReferrerBonus(address indexed referer, address indexed player, uint256 betAmount , uint256 trxReceived, uint256 timestamp );
+    event ReferrerBonus(address indexed referer, address indexed player, uint256 betAmount , uint256 etherReceived, uint256 timestamp );
     event ReferrerBonusWithdrawn(address indexed referrer, uint256 indexed amount);
 
     /*========================================
@@ -274,7 +274,7 @@ contract TRONtopia_Referral_Pool is owned{
         * This function will allow to add referrer bonus only, without updating the referrer.
         * This function is called assuming already existing referrer of user
     */
-    function payReferrerBonusOnly(address _user, uint256 _trxAmount ) public returns(bool){
+    function payReferrerBonusOnly(address _user, uint256 _etherAmount ) public returns(bool){
         
         //this does not check for the presence of existing referer.. to save gas. 
         //In the rare event of existing 0x0 referrer does not have much harm.
@@ -286,12 +286,12 @@ contract TRONtopia_Referral_Pool is owned{
         //calculate final referrer bonus, considering its tiers: bronze - siver - gold
         //final ref bonus = total winning * ref bonus percentage according to tiers / 100
         //the reason to put 100000, which is three extra zeros, is because we multiplied with 1000 while calculating ref bonus percetange
-        uint256 _finalRefBonus = _trxAmount * findReferrerBonusTier(referrer) / 100000;
+        uint256 _finalRefBonus = _etherAmount / 100000;
 
         referrerBonusBalance[referrers[_user]] += _finalRefBonus;
-        if(referrer != address(0)) referralsWageredAllTime[referrer] += _trxAmount;
+        if(referrer != address(0)) referralsWageredAllTime[referrer] += _etherAmount;
 
-        emit ReferrerBonus(referrer, _user, _trxAmount , _finalRefBonus, now );
+        emit ReferrerBonus(referrer, _user, _etherAmount , _finalRefBonus, now );
         return true;
     }
 
@@ -299,7 +299,7 @@ contract TRONtopia_Referral_Pool is owned{
         * This function will allow to add referrer bonus and add new referrer.
         * This function is called when using referrer link first time only.
     */
-    function payReferrerBonusAndAddReferrer(address _user, address _referrer, uint256 _trxAmount) public returns(bool){
+    function payReferrerBonusAndAddReferrer(address _user, address _referrer, uint256 _etherAmount) public returns(bool){
         
         //this does not check for the presence of existing referer.. to save gas. 
         //In the rare event of existing 0x0 referrer does not have much harm.
@@ -309,33 +309,14 @@ contract TRONtopia_Referral_Pool is owned{
         //calculate final referrer bonus, considering its tiers: bronze - siver - gold
         //final ref bonus = total winning * ref bonus percentage according to tiers / 100
         //the reason to put 100000, which is three extra zeros, is because we multiplied with 1000 while calculating ref bonus percetange
-        uint256 _finalRefBonus = _trxAmount * findReferrerBonusTier(_referrer) / 100000;
+        uint256 _finalRefBonus = _etherAmount  / 100000;
   
         referrers[_user] = _referrer;
         referrerBonusBalance[_referrer] += _finalRefBonus;
-        referralsWageredAllTime[_referrer] += _trxAmount;
+        referralsWageredAllTime[_referrer] += _etherAmount;
     
-        emit ReferrerBonus(_referrer, _user, _trxAmount , _finalRefBonus, now );
+        emit ReferrerBonus(_referrer, _user, _etherAmount , _finalRefBonus, now );
         return true;
     }
-
-    /**
-        * Function to find the referral bonus tiers based on net profit
-    */
-    function findReferrerBonusTier(address _referrer) public view returns(uint256){
-        if(referralsWageredAllTime[_referrer] <= 1000000000000000){ //1000000000000000 is 1 Billion in SUN
-            return 50;      //total referrals wager less than 1 Billion => Bronze => then 0.05% of wagered amount
-        }
-        else if(referralsWageredAllTime[_referrer] <= 10000000000000000){ 
-            return 75;      //total referrals wager is greater than 1 billion and less than 10 billion => Silver => then 0.075% of wagered amount
-        }
-        else { 
-            return 100;      //total referrals wager is greater than 10 billion => Gold => then 0.1% of wagered amount
-        }
-    }
-
-  
-    
-
 
 }
