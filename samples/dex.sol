@@ -1,4 +1,4 @@
- pragma solidity 0.5.11;  /*
+pragma solidity 0.5.11;  /*
  
  
  
@@ -172,6 +172,16 @@ interface ERC20Essential
 }
 
 
+
+interface InterfaceREFERRAL {
+    function referrers(address user) external returns(address);
+    function updateReferrer(address _user, address _referrer) external returns(bool);
+    function payReferrerBonusOnly(address _user, uint256 _trxAmount ) external returns(bool);
+    //function payReferrerBonusAndAddReferrer(address _user, address _referrer, uint256 _trxAmount, uint256 _refBonus) external returns(bool);
+}
+
+
+
 contract EasyDEX is owned {
   using SafeMath for uint256;
   bool public safeGuard; // To hault all non owner functions in case of imergency - by default false
@@ -189,7 +199,7 @@ contract EasyDEX is owned {
   event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
   event OwnerWithdrawTradingFee(address indexed owner, uint256 amount);
 
-
+  address public refPoolContractAddress;
 
     constructor() public {
         feeAccount = msg.sender;
@@ -216,6 +226,14 @@ contract EasyDEX is owned {
         return c;
     }  
 
+    /**
+        Function allows owner to update the Topia contract address
+    */
+    function updateContractAddresses(address refPoolContract) public onlyOwner returns(string memory)
+    {
+        refPoolContractAddress = refPoolContract;
+        return "done";
+    }
 
 
     
@@ -283,9 +301,16 @@ contract EasyDEX is owned {
     return tokens[token][user];
   }
 
-  function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce) public {
+  function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address _referrer) public {
     bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
     orders[msg.sender][hash] = true;
+        
+    // Set referer address if user has usd ref link and does not have any existing referer...
+    if (_referrer != address(0x0) && InterfaceREFERRAL(refPoolContractAddress).referrers(msg.sender) == address(0x0) )
+    {
+        // Set their referral address
+        InterfaceREFERRAL(refPoolContractAddress).updateReferrer(msg.sender, _referrer);
+    }
     emit Order(now, tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender);
   }
 
@@ -300,6 +325,14 @@ contract EasyDEX is owned {
     ));
     tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
     orderFills[user][hash] = orderFills[user][hash].add(amount);
+    // If the user won their main bet, their sidebet or both, their referrer gets payed
+    if (InterfaceREFERRAL(refPoolContractAddress).referrers(user) != address(0x0))
+    {           
+        // Processing referral system fund distribution
+        // [✓] 0.2% trx to referral if any.
+        InterfaceREFERRAL(refPoolContractAddress).payReferrerBonusOnly(user,amount);
+    }
+
     emit Trade(now, tokenGet, amount, tokenGive, amountGive * amount / amountGet, user, msg.sender);
   }
 
