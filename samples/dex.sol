@@ -1,4 +1,4 @@
-pragma solidity 0.5.11;  /*
+pragma solidity 0.5.12;  /*
  
  
  
@@ -129,6 +129,17 @@ library SafeMath {
 }
 
 
+interface ERC20Essential 
+{
+
+    function transfer(address _to, uint256 _amount) external returns (bool);
+    function transferFrom(address _from, address _to, uint256 _amount) external returns (bool);
+
+}
+
+
+
+
 //*******************************************************************//
 //------------------ Contract to Manage Ownership -------------------//
 //*******************************************************************//
@@ -163,43 +174,38 @@ contract owned {
     }
 }
 
-interface ERC20Essential 
-{
-
-    function transfer(address _to, uint256 _amount) external returns (bool);
-    function transferFrom(address _from, address _to, uint256 _amount) external returns (bool);
-
-}
-
-
-
-interface InterfaceREFERRAL {
-    function referrers(address user) external returns(address);
-    function updateReferrer(address _user, address _referrer) external returns(bool);
-    function payReferrerBonusOnly(address _user, uint256 _trxAmount ) external returns(bool);
-    //function payReferrerBonusAndAddReferrer(address _user, address _referrer, uint256 _trxAmount, uint256 _refBonus) external returns(bool);
-}
-
 
 
 contract EasyDEX is owned {
   using SafeMath for uint256;
   bool public safeGuard; // To hault all non owner functions in case of imergency - by default false
   address public feeAccount; //the account that will receive fees
-  uint public tradingFee = 50; // 50 = 0.5%
+  uint public tradingFee = 30; // 30 = 0.3%
+  
+  //referrals
+  uint256 public refPercent = 10;  // percent to calculate referal bonous - by default 10% of trading fee
   
   mapping (address => mapping (address => uint)) public tokens; //mapping of token addresses to mapping of account balances (token=0 means Ether)
   mapping (address => mapping (bytes32 => bool)) public orders; //mapping of user accounts to mapping of order hashes to booleans (true = submitted by user, equivalent to offchain signature)
   mapping (address => mapping (bytes32 => uint)) public orderFills; //mapping of user accounts to mapping of order hashes to uints (amount of order that has been filled)
   
-  event Order(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user);
-  event Cancel(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s);
+  /* Mapping to track referrer. The second address is the address of referrer, the Up-line/ Sponsor */
+  mapping (address => address) public referrers;
+  /* Mapping to track referrer bonus for all the referrers */
+  mapping (address => uint) public referrerBonusBalance;
+  
+  event Order(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires,  address user);
+  event Cancel(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s);
   event Trade(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give);
   event Deposit(uint256 curTime, address token, address user, uint amount, uint balance);
   event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
   event OwnerWithdrawTradingFee(address indexed owner, uint256 amount);
+  
+  // Events to track ether transfer to referrers
+  event ReferrerBonus(address indexed referer, address indexed trader, uint256 referralBonus, uint256 timestamp );
+  event ReferrerBonusWithdrawn(address indexed referrer, uint256 indexed amount);
 
-  address public refPoolContractAddress;
+  
 
     constructor() public {
         feeAccount = msg.sender;
@@ -226,14 +232,6 @@ contract EasyDEX is owned {
         return c;
     }  
 
-    /**
-        Function allows owner to update the Topia contract address
-    */
-    function updateContractAddresses(address refPoolContract) public onlyOwner returns(string memory)
-    {
-        refPoolContractAddress = refPoolContract;
-        return "done";
-    }
 
 
     
@@ -301,68 +299,63 @@ contract EasyDEX is owned {
     return tokens[token][user];
   }
 
-  function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address _referrer) public {
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
+  function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires) public {
+    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
     orders[msg.sender][hash] = true;
-        
-    // Set referer address if user has usd ref link and does not have any existing referer...
-    if (_referrer != address(0x0) && InterfaceREFERRAL(refPoolContractAddress).referrers(msg.sender) == address(0x0) )
-    {
-        // Set their referral address
-        InterfaceREFERRAL(refPoolContractAddress).updateReferrer(msg.sender, _referrer);
-    }
-    emit Order(now, tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender);
+    emit Order(now, tokenGet, amountGet, tokenGive, amountGive, expires, msg.sender);
   }
 
-  function trade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount) public {
+
+    /* address[4] addressArray elements
+        0 = tokenGet
+        1 = tokenGive
+        2 = tradeMaker
+        3 = referrer
+    */
+  function trade(address[4] memory addressArray, uint amountGet, uint amountGive, uint expires, uint8 v, bytes32 r, bytes32 s, uint amount) public {
     require(!safeGuard,"System Paused by Admin");
     //amount is in amountGet terms
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
+    bytes32 hash = keccak256(abi.encodePacked(this, addressArray[0], amountGet, addressArray[1], amountGive, expires));
     require((
-      (orders[user][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == user) &&
+      (orders[addressArray[2]][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == addressArray[2]) &&
       block.number <= expires &&
-      orderFills[user][hash].add(amount) <= amountGet
+      orderFills[addressArray[2]][hash].add(amount) <= amountGet
     ));
-    tradeBalances(tokenGet, amountGet, tokenGive, amountGive, user, amount);
-    orderFills[user][hash] = orderFills[user][hash].add(amount);
-    // If the user won their main bet, their sidebet or both, their referrer gets payed
-    if (InterfaceREFERRAL(refPoolContractAddress).referrers(user) != address(0x0))
-    {           
-        // Processing referral system fund distribution
-        // [✓] 0.2% trx to referral if any.
-        InterfaceREFERRAL(refPoolContractAddress).payReferrerBonusOnly(user,amount);
-    }
-
-    emit Trade(now, tokenGet, amount, tokenGive, amountGive * amount / amountGet, user, msg.sender);
+    tradeBalances(addressArray[0], amountGet, addressArray[1], amountGive, addressArray[2], amount, addressArray[3]);
+    orderFills[addressArray[2]][hash] = orderFills[addressArray[2]][hash].add(amount);
+    
+    
+    emit Trade(now, addressArray[0], amount, addressArray[1], amountGive * amount / amountGet, addressArray[2], msg.sender);
   }
 
-  function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount) internal {
+  function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount, address referrer) internal {
     
     uint tradingFeeXfer = calculatePercentage(amount,tradingFee);
-    /*if (accountLevelsAddr != 0x0) {
-      uint accountLevel = AccountLevels(accountLevelsAddr).accountLevel(user);
-      if (accountLevel==1) feeRebateXfer = amount.mul(feeRebate) / (1 ether);
-      if (accountLevel==2) feeRebateXfer = feeTakeXfer;
-    }*/
+    
+    //processing referrers bonus - which is % of the trading fee
+    processReferrerBonus(referrer, tradingFeeXfer);
+
     tokens[tokenGet][msg.sender] = tokens[tokenGet][msg.sender].sub(amount.add(tradingFeeXfer));
     tokens[tokenGet][user] = tokens[tokenGet][user].add(amount.sub(tradingFeeXfer));
     tokens[address(0)][feeAccount] = tokens[address(0)][feeAccount].add(tradingFeeXfer);
-    //tokens[tokenGet][feeAccount] = tokens[tokenGet][feeAccount].add(tradingFeeXfer.add(feeTakeXfer).sub(feeRebateXfer));
+
     tokens[tokenGive][user] = tokens[tokenGive][user].sub(amountGive.mul(amount) / amountGet);
     tokens[tokenGive][msg.sender] = tokens[tokenGive][msg.sender].add(amountGive.mul(amount) / amountGet);
   }
+  
+  
 
-  function testTrade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s, uint amount, address sender) public view returns(bool) {
+  function testTrade(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s, uint amount, address sender) public view returns(bool) {
     
     if (!(
       tokens[tokenGet][sender] >= amount &&
-      availableVolume(tokenGet, amountGet, tokenGive, amountGive, expires, nonce, user, v, r, s) >= amount
+      availableVolume(tokenGet, amountGet, tokenGive, amountGive, expires, user, v, r, s) >= amount
     )) return false;
     return true;
   }
 
-  function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
+  function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
+    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
     uint available1;
     if (!(
       (orders[user][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == user) &&
@@ -375,16 +368,74 @@ contract EasyDEX is owned {
     
   }
 
-  function amountFilled(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, address user) public view returns(uint) {
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
+  function amountFilled(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user) public view returns(uint) {
+    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
     return orderFills[user][hash];
   }
 
-  function cancelOrder(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint nonce, uint8 v, bytes32 r, bytes32 s) public {
+  function cancelOrder(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint8 v, bytes32 r, bytes32 s) public {
     require(!safeGuard,"System Paused by Admin");
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires, nonce));
+    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
     require((orders[msg.sender][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == msg.sender));
     orderFills[msg.sender][hash] = amountGet;
-    emit Cancel(now, tokenGet, amountGet, tokenGive, amountGive, expires, nonce, msg.sender, v, r, s);
+    emit Cancel(now, tokenGet, amountGet, tokenGive, amountGive, expires, msg.sender, v, r, s);
   }
+
+
+
+//==================================================//
+//              REFERRAL SECTION CODE               //
+//==================================================//
+
+function processReferrerBonus(address _referrer, uint256 _tradingFeeLocal) internal {
+      
+      address existingReferrer = referrers[msg.sender];
+      
+      if(_referrer != address(0) && existingReferrer != address(0) ){
+        referrerBonusBalance[existingReferrer] += _tradingFeeLocal * refPercent / 100;
+        emit ReferrerBonus(_referrer, msg.sender, _tradingFeeLocal * refPercent / 100, now );
+      }
+      else if(_referrer != address(0) && existingReferrer == address(0) ){
+        //no referrer exist, but provided in trade function call
+        referrerBonusBalance[_referrer] += _tradingFeeLocal * refPercent / 100;
+        referrers[msg.sender] = _referrer;
+        emit ReferrerBonus(_referrer, msg.sender, _tradingFeeLocal * refPercent / 100, now );
+      }
+  }
+  
+  function changeRefPercent(uint256 newRefPercent) public onlyOwner returns (string memory){
+      require(newRefPercent <= 100, 'newRefPercent can not be more than 100');
+      refPercent = newRefPercent;
+      return "refPool fee updated successfully";
+  }
+  
+  /**
+        * Function will allow users to withdraw their referrer bonus  
+    */
+    function claimReferrerBonus() public returns(bool) {
+        
+        address payable msgSender = msg.sender;
+        
+        uint256 referralBonus = referrerBonusBalance[msgSender];
+        
+        require(referralBonus > 0, 'Insufficient referrer bonus');
+        referrerBonusBalance[msgSender] = 0;
+        
+        
+        //transfer the referrer bonus
+        msgSender.transfer(referralBonus);
+        
+        //fire event
+        emit ReferrerBonusWithdrawn(msgSender, referralBonus);
+        
+        return true;
+    }
+
+
+
+
+
+
+
+
 }
