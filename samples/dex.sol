@@ -235,8 +235,8 @@ contract EasyDEX is owned {
 
 
     
-  // contract without fallback automatically reject incoming ether
-  // function() external {  }
+  // contract accepts incoming ether -  this needed in case owner want to fund refPool
+  function() payable external {  }
 
 
   function changeFeeAccount(address feeAccount_) public onlyOwner {
