@@ -156,7 +156,7 @@ contract owned {
     }
 
     modifier onlyOwner {
-        require(msg.sender == owner);
+        require(msg.sender == owner, 'Only owner can call this function');
         _;
     }
 
@@ -167,7 +167,7 @@ contract owned {
 
     //this flow is to prevent transferring ownership to wrong wallet by mistake
     function acceptOwnership() public {
-        require(msg.sender == newOwner);
+        require(msg.sender == newOwner, 'Only new owner can call this function');
         emit OwnershipTransferred(now, owner, newOwner);
         owner = newOwner;
         newOwner = address(0);
@@ -227,7 +227,7 @@ contract EasyDEX is owned {
     function calculatePercentage(uint256 PercentOf, uint256 percentTo ) internal pure returns (uint256) 
     {
         uint256 factor = 10000;
-        require(percentTo <= factor);
+        require(percentTo <= factor, 'percentTo must be less than factor');
         uint256 c = PercentOf.mul(percentTo).div(factor);
         return c;
     }  
@@ -244,7 +244,7 @@ contract EasyDEX is owned {
   }
 
   function changetradingFee(uint tradingFee_) public onlyOwner{
-    //require(tradingFee_ <= tradingFee);
+    require(tradingFee_ <= 10000, 'trading fee can not be more than 100%');
     tradingFee = tradingFee_;
   }
   
@@ -272,24 +272,24 @@ contract EasyDEX is owned {
 
   function withdraw(uint amount) public {
     require(!safeGuard,"System Paused by Admin");
-    require(tokens[address(0)][msg.sender] >= amount);
+    require(tokens[address(0)][msg.sender] >= amount, 'Not enough balance');
     tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].sub(amount);
     msg.sender.transfer(amount);
     emit Withdraw(now, address(0), msg.sender, amount, tokens[address(0)][msg.sender]);
   }
 
   function depositToken(address token, uint amount) public {
-    //remember to call Token(address).approve(this, amount) or this contract will not be able to do the transfer on your behalf.
-    require(token!=address(0));
-    require(ERC20Essential(token).transferFrom(msg.sender, address(this), amount));
+    //remember to call Token(address).approve(address(this), amount) or this contract will not be able to do the transfer on your behalf.
+    require(token!=address(0), 'Invalid token address');
+    require(ERC20Essential(token).transferFrom(msg.sender, address(this), amount), 'tokens could not be transferred');
     tokens[token][msg.sender] = tokens[token][msg.sender].add(amount);
     emit Deposit(now, token, msg.sender, amount, tokens[token][msg.sender]);
   }
 	
   function withdrawToken(address token, uint amount) public {
     require(!safeGuard,"System Paused by Admin");
-    require(token!=address(0));
-    require(tokens[token][msg.sender] >= amount);
+    require(token!=address(0), 'Invalid token address');
+    require(tokens[token][msg.sender] >= amount, 'not enough token balance');
     tokens[token][msg.sender] = tokens[token][msg.sender].sub(amount);
 	  ERC20Essential(token).transfer(msg.sender, amount);
     emit Withdraw(now, token, msg.sender, amount, tokens[token][msg.sender]);
@@ -300,7 +300,7 @@ contract EasyDEX is owned {
   }
 
   function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires) public {
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
+    bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
     orders[msg.sender][hash] = true;
     emit Order(now, tokenGet, amountGet, tokenGive, amountGive, expires, msg.sender);
   }
@@ -315,12 +315,12 @@ contract EasyDEX is owned {
   function trade(address[4] memory addressArray, uint amountGet, uint amountGive, uint expires, uint8 v, bytes32 r, bytes32 s, uint amount) public {
     require(!safeGuard,"System Paused by Admin");
     //amount is in amountGet terms
-    bytes32 hash = keccak256(abi.encodePacked(this, addressArray[0], amountGet, addressArray[1], amountGive, expires));
-    require((
+    bytes32 hash = keccak256(abi.encodePacked(address(this), addressArray[0], amountGet, addressArray[1], amountGive, expires));
+    require(
       (orders[addressArray[2]][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == addressArray[2]) &&
       block.number <= expires &&
-      orderFills[addressArray[2]][hash].add(amount) <= amountGet
-    ));
+      orderFills[addressArray[2]][hash].add(amount) <= amountGet,
+      'Invalid trade order');
     tradeBalances(addressArray[0], amountGet, addressArray[1], amountGive, addressArray[2], amount, addressArray[3]);
     orderFills[addressArray[2]][hash] = orderFills[addressArray[2]][hash].add(amount);
     
@@ -353,9 +353,17 @@ contract EasyDEX is owned {
     )) return false;
     return true;
   }
+  
+  function testVRS(address tokenGet, uint256 amountGet, address tokenGive, uint256 amountGive, uint256 expires, uint8 v, bytes32 r, bytes32 s ) public view returns(address){
+      
+      bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
+     
+      return ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s);
+    
+  }
 
   function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
+    bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
     uint available1;
     if (!(
       (orders[user][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == user) &&
@@ -369,14 +377,14 @@ contract EasyDEX is owned {
   }
 
   function amountFilled(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user) public view returns(uint) {
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
+    bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
     return orderFills[user][hash];
   }
 
   function cancelOrder(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint8 v, bytes32 r, bytes32 s) public {
     require(!safeGuard,"System Paused by Admin");
-    bytes32 hash = keccak256(abi.encodePacked(this, tokenGet, amountGet, tokenGive, amountGive, expires));
-    require((orders[msg.sender][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == msg.sender));
+    bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
+    require(orders[msg.sender][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == msg.sender, 'Invalid trade order');
     orderFills[msg.sender][hash] = amountGet;
     emit Cancel(now, tokenGet, amountGet, tokenGive, amountGive, expires, msg.sender, v, r, s);
   }
