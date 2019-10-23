@@ -196,7 +196,7 @@ contract EasyDEX is owned {
   
   event Order(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires,  address user);
   event Cancel(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s);
-  event Trade( address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give, uint256 orderBookID);
+  event Trade( uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give, uint256 orderBookID);
   event Deposit(uint256 curTime, address token, address user, uint amount, uint balance);
   event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
   event OwnerWithdrawTradingFee(address indexed owner, uint256 amount);
@@ -326,7 +326,7 @@ contract EasyDEX is owned {
     orderFills[addressArray[2]][hash] = orderFills[addressArray[2]][hash].add(amount);
     
     
-    emit Trade( addressArray[0], amount, addressArray[1], amountGive * amount / amountGet, addressArray[2], msg.sender, orderBookID);
+    emit Trade(now, addressArray[0], amount, addressArray[1], amountGive * amount / amountGet, addressArray[2], msg.sender, orderBookID);
   }
     
     /**
