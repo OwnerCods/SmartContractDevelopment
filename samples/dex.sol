@@ -196,7 +196,7 @@ contract EasyDEX is owned {
   
   event Order(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires,  address user);
   event Cancel(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s);
-  event Trade(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give);
+  event Trade( address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give, uint256 orderBookID);
   event Deposit(uint256 curTime, address token, address user, uint amount, uint balance);
   event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
   event OwnerWithdrawTradingFee(address indexed owner, uint256 amount);
@@ -312,7 +312,7 @@ contract EasyDEX is owned {
         2 = tradeMaker
         3 = referrer
     */
-  function trade(address[4] memory addressArray, uint amountGet, uint amountGive, uint expires, uint8 v, bytes32 r, bytes32 s, uint amount) public {
+  function trade(address[4] memory addressArray, uint amountGet, uint amountGive, uint expires, uint8 v, bytes32 r, bytes32 s, uint amount, uint orderBookID) public {
     require(!safeGuard,"System Paused by Admin");
     //amount is in amountGet terms
     bytes32 hash = keccak256(abi.encodePacked(address(this), addressArray[0], amountGet, addressArray[1], amountGive, expires));
@@ -321,26 +321,34 @@ contract EasyDEX is owned {
       block.number <= expires &&
       orderFills[addressArray[2]][hash].add(amount) <= amountGet,
       'Invalid trade order');
-    tradeBalances(addressArray[0], amountGet, addressArray[1], amountGive, addressArray[2], amount, addressArray[3]);
+
+    tradeBalances(addressArray, amountGet, amountGive, amount );
     orderFills[addressArray[2]][hash] = orderFills[addressArray[2]][hash].add(amount);
     
     
-    emit Trade(now, addressArray[0], amount, addressArray[1], amountGive * amount / amountGet, addressArray[2], msg.sender);
+    emit Trade( addressArray[0], amount, addressArray[1], amountGive * amount / amountGet, addressArray[2], msg.sender, orderBookID);
   }
-
-  function tradeBalances(address tokenGet, uint amountGet, address tokenGive, uint amountGive, address user, uint amount, address referrer) internal {
+    
+    /**
+        addressArray array elements
+        0 = tokenGet
+        1 = tokenGive
+        2 = user
+        3 = referrer
+    */
+  function tradeBalances(address[4] memory addressArray, uint amountGet, uint amountGive, uint amount) internal {
     
     uint tradingFeeXfer = calculatePercentage(amount,tradingFee);
     
     //processing referrers bonus - which is % of the trading fee
-    processReferrerBonus(referrer, tradingFeeXfer);
+    processReferrerBonus(addressArray[3], tradingFeeXfer);
 
-    tokens[tokenGet][msg.sender] = tokens[tokenGet][msg.sender].sub(amount.add(tradingFeeXfer));
-    tokens[tokenGet][user] = tokens[tokenGet][user].add(amount.sub(tradingFeeXfer));
-    tokens[address(0)][feeAccount] = tokens[address(0)][feeAccount].add(tradingFeeXfer);
+    tokens[addressArray[0]][msg.sender] = tokens[addressArray[0]][msg.sender].sub(amount.add(tradingFeeXfer));
+    tokens[addressArray[0]][addressArray[2]] = tokens[addressArray[0]][addressArray[2]].add(amount.sub(tradingFeeXfer));
+    tokens[addressArray[0]][feeAccount] = tokens[addressArray[0]][feeAccount].add(tradingFeeXfer);
 
-    tokens[tokenGive][user] = tokens[tokenGive][user].sub(amountGive.mul(amount) / amountGet);
-    tokens[tokenGive][msg.sender] = tokens[tokenGive][msg.sender].add(amountGive.mul(amount) / amountGet);
+    tokens[addressArray[1]][addressArray[2]] = tokens[addressArray[1]][addressArray[2]].sub(amountGive.mul(amount) / amountGet);
+    tokens[addressArray[1]][msg.sender] = tokens[addressArray[1]][msg.sender].add(amountGive.mul(amount) / amountGet);
   }
   
   
