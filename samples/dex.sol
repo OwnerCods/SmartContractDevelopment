@@ -146,7 +146,7 @@ interface ERC20Essential
     
 contract owned {
     address public owner;
-    address public newOwner;
+    address private newOwner;
 
 
     event OwnershipTransferred(uint256 curTime, address indexed _from, address indexed _to);
