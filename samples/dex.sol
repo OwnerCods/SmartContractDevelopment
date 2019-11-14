@@ -199,7 +199,7 @@ contract EasyDEX is owned {
   event Trade( uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give, uint256 orderBookID);
   event Deposit(uint256 curTime, address token, address user, uint amount, uint balance);
   event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
-  event OwnerWithdrawTradingFee(address indexed owner, uint256 amount);
+  event OwnerWithdrawCommission(address indexed owner, address indexed tokenAddress, uint256 amount);
   
   // Events to track ether transfer to referrers
   event ReferrerBonus(address indexed referer, address indexed trader, uint256 referralBonus, uint256 timestamp );
@@ -248,21 +248,34 @@ contract EasyDEX is owned {
     tradingFee = tradingFee_;
   }
   
-  function availableTradingFeeOwner() public view returns(uint256){
-      //it only holds ether as fee
+  function availableOwnerCommissionEther() public view returns(uint256){
+      //assress 0x0 only holds ether as fee
       return tokens[address(0)][feeAccount];
   }
   
-  function withdrawTradingFeeOwner() public onlyOwner returns (string memory){
-      uint256 amount = availableTradingFeeOwner();
+  function availableOwnerCommissionToken(address tokenAddress) public view returns(uint256){
+      //assress 0x0 only holds ether as fee
+      return tokens[tokenAddress][feeAccount];
+  }
+  
+  function withdrawOwnerCommissoinEther() public  returns (string memory){
+      require(msg.sender == feeAccount, 'Invalid caller');
+      uint256 amount = availableOwnerCommissionEther();
       require (amount > 0, 'Nothing to withdraw');
-      
       tokens[address(0)][feeAccount] = 0;
-      
       msg.sender.transfer(amount);
-      
-      emit OwnerWithdrawTradingFee(owner, amount);
-      
+      emit OwnerWithdrawCommission(msg.sender, address(0), amount);
+      return "Ether withdrawn successfully";
+  }
+  
+  function withdrawOwnerCommissoinToken(address tokenAddress) public  returns (string memory){
+      require(msg.sender == feeAccount, 'Invalid caller');
+      uint256 amount = availableOwnerCommissionToken(tokenAddress);
+      require (amount > 0, 'Nothing to withdraw');
+      tokens[tokenAddress][feeAccount] = 0;
+      ERC20Essential(tokenAddress).transfer(msg.sender, amount);
+      emit OwnerWithdrawCommission(msg.sender, tokenAddress, amount);
+      return "Token withdrawn successfully";
   }
 
   function deposit() public payable {
