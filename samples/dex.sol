@@ -1,4 +1,4 @@
-pragma solidity 0.5.12;  /*
+pragma solidity 0.5.13;  /*
  
  
  
@@ -180,7 +180,7 @@ contract EasyDEX is owned {
   using SafeMath for uint256;
   bool public safeGuard; // To hault all non owner functions in case of imergency - by default false
   address public feeAccount; //the account that will receive fees
-  uint public tradingFee = 30; // 30 = 0.3%
+  uint public tradingFee = 300; // 300 = 0.3%
   
   //referrals
   uint256 public refPercent = 10;  // percent to calculate referal bonous - by default 10% of trading fee
@@ -226,7 +226,7 @@ contract EasyDEX is owned {
     //Calculate percent and return result
     function calculatePercentage(uint256 PercentOf, uint256 percentTo ) internal pure returns (uint256) 
     {
-        uint256 factor = 10000;
+        uint256 factor = 100000;    //so to make 1000 = 1%
         require(percentTo <= factor, 'percentTo must be less than factor');
         uint256 c = PercentOf.mul(percentTo).div(factor);
         return c;
@@ -329,15 +329,12 @@ contract EasyDEX is owned {
     require(!safeGuard,"System Paused by Admin");
     //amount is in amountGet terms
     bytes32 hash = keccak256(abi.encodePacked(address(this), addressArray[0], amountGet, addressArray[1], amountGive, expires));
-    require(
-      (orders[addressArray[2]][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == addressArray[2]) &&
-      block.number <= expires &&
-      orderFills[addressArray[2]][hash].add(amount) <= amountGet,
-      'Invalid trade order');
+    require(orders[addressArray[2]][hash] || ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s) == addressArray[2], 'Invalid trade parameters');
+    require(block.number <= expires, 'Trade is expired');
+    require(orderFills[addressArray[2]][hash].add(amount) <= amountGet, 'Trade order is filled');
 
     tradeBalances(addressArray, amountGet, amountGive, amount );
     orderFills[addressArray[2]][hash] = orderFills[addressArray[2]][hash].add(amount);
-    
     
     emit Trade(now, addressArray[0], amount, addressArray[1], amountGive * amount / amountGet, addressArray[2], msg.sender, orderBookID);
   }
@@ -357,7 +354,7 @@ contract EasyDEX is owned {
     processReferrerBonus(addressArray[3], tradingFeeXfer);
 
     tokens[addressArray[0]][msg.sender] = tokens[addressArray[0]][msg.sender].sub(amount.add(tradingFeeXfer));
-    tokens[addressArray[0]][addressArray[2]] = tokens[addressArray[0]][addressArray[2]].add(amount.sub(tradingFeeXfer));
+    tokens[addressArray[0]][addressArray[2]] = tokens[addressArray[0]][addressArray[2]].add(amount);
     tokens[addressArray[0]][feeAccount] = tokens[addressArray[0]][feeAccount].add(tradingFeeXfer);
 
     tokens[addressArray[1]][addressArray[2]] = tokens[addressArray[1]][addressArray[2]].sub(amountGive.mul(amount) / amountGet);
