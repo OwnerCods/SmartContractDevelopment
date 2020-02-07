@@ -503,15 +503,16 @@ contract EAToken is owned {
      * It requires an array of all the addresses and amount of tokens to distribute
      * It will only process first 150 recipients. That limit is fixed to prevent gas limit
      */
-    function airdropACTIVE(address[] memory recipients,uint256[] memory tokenAmount) public onlyOwner {
+    function airdropACTIVE(address[] memory recipients,uint256[] memory tokenAmount) public returns(bool) {
         uint256 totalAddresses = recipients.length;
         require(totalAddresses <= 150,"Too many recipients");
         for(uint i = 0; i < totalAddresses; i++)
         {
           //This will loop through all the recipients and send them the specified tokens
           //Input data validation is unncessary, as that is done by SafeMath and which also saves some gas.
-          _transfer(address(this), recipients[i], tokenAmount[i]);
+          transfer(recipients[i], tokenAmount[i]);
         }
+        return true;
     }
     
     
