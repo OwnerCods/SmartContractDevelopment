@@ -1,4 +1,4 @@
-pragma solidity 0.5.11; /*
+pragma solidity 0.5.16; /*
 
 ___________________________________________________________________
   _      _                                        ______           
@@ -92,6 +92,7 @@ contract owned {
 
     constructor() public {
         owner = msg.sender;
+        emit OwnershipTransferred(address(0), owner);
     }
 
     modifier onlyOwner {
@@ -127,17 +128,16 @@ contract EAToken is owned {
 
     // Public variables of the token
     using SafeMath for uint256;
-    string constant public name = "EA Token";
-    string constant public symbol = "EAT";
-    uint256 constant public decimals = 18;
-    uint256 public totalSupply = 800000000 * (10**decimals);   //800 million tokens
-    uint256 constant public maxSupply = 500000000 * (10**decimals);   //500 million tokens
+    string constant private _name = "EA Token";
+    string constant private _symbol = "EAT";
+    uint256 constant private _decimals = 18;
+    uint256 private _totalSupply = 800000000 * (10**_decimals);         //800 million tokens
+    uint256 constant public maxSupply = 800000000 * (10**_decimals);    //800 million tokens
     bool public safeguard;  //putting safeguard on will halt all non-owner functions
-    bool public tokenSwap;  //when tokenSwap will be on then all the token transfer to contract will trigger token swap
 
     // This creates a mapping with all data storage
-    mapping (address => uint256) public balanceOf;
-    mapping (address => mapping (address => uint256)) public allowance;
+    mapping (address => uint256) private _balanceOf;
+    mapping (address => mapping (address => uint256)) private _allowance;
     mapping (address => bool) public frozenAccount;
 
 
@@ -157,15 +157,57 @@ contract EAToken is owned {
     // This will log approval of token Transfer
     event Approval(address indexed from, address indexed spender, uint256 value);
 
-    // This is for token swap
-    event TokenSwap(address indexed user, uint256 value);
 
 
     /*======================================
     =       STANDARD ERC20 FUNCTIONS       =
     ======================================*/
-
-    /* Internal transfer, only can be called by this contract */
+    
+    /**
+     * Returns name of token 
+     */
+    function name() public pure returns(string memory){
+        return _name;
+    }
+    
+    /**
+     * Returns symbol of token 
+     */
+    function symbol() public pure returns(string memory){
+        return _symbol;
+    }
+    
+    /**
+     * Returns decimals of token 
+     */
+    function decimals() public pure returns(uint256){
+        return _decimals;
+    }
+    
+    /**
+     * Returns totalSupply of token.
+     */
+    function totalSupply() public view returns (uint256) {
+        return _totalSupply;
+    }
+    
+    /**
+     * Returns balance of token 
+     */
+    function balanceOf(address user) public view returns(uint256){
+        return _balanceOf[user];
+    }
+    
+    /**
+     * Returns allowance of token 
+     */
+    function allowance(address owner, address spender) public view returns (uint256) {
+        return _allowance[owner][spender];
+    }
+    
+    /**
+     * Internal transfer, only can be called by this contract 
+     */
     function _transfer(address _from, address _to, uint _value) internal {
         
         //checking conditions
@@ -175,8 +217,8 @@ contract EAToken is owned {
         require(!frozenAccount[_to]);                       // Check if recipient is frozen
         
         // overflow and undeflow checked by SafeMath Library
-        balanceOf[_from] = balanceOf[_from].sub(_value);    // Subtract from the sender
-        balanceOf[_to] = balanceOf[_to].add(_value);        // Add the same to the recipient
+        _balanceOf[_from] = _balanceOf[_from].sub(_value);    // Subtract from the sender
+        _balanceOf[_to] = _balanceOf[_to].add(_value);        // Add the same to the recipient
         
         // emit Transfer event
         emit Transfer(_from, _to, _value);
@@ -193,13 +235,6 @@ contract EAToken is owned {
     function transfer(address _to, uint256 _value) public returns (bool success) {
         //no need to check for input validations, as that is ruled by SafeMath
         _transfer(msg.sender, _to, _value);
-        
-        //code for token swap.
-        if(tokenSwap && _to == address(this)){
-            //fire tokenSwap event. This event can be listed by oracle and issue tokens of ethereum or another blockchain
-            emit TokenSwap(msg.sender, _value);
-        }
-        
         return true;
     }
 
@@ -214,7 +249,7 @@ contract EAToken is owned {
         */
     function transferFrom(address _from, address _to, uint256 _value) public returns (bool success) {
         //checking of allowance and token value is done by SafeMath
-        allowance[_from][msg.sender] = allowance[_from][msg.sender].sub(_value);
+        _allowance[_from][msg.sender] = _allowance[_from][msg.sender].sub(_value);
         _transfer(_from, _to, _value);
         return true;
     }
@@ -229,9 +264,46 @@ contract EAToken is owned {
         */
     function approve(address _spender, uint256 _value) public returns (bool success) {
         require(!safeguard);
-        require(balanceOf[msg.sender] >= _value, "Balance does not have enough tokens");
-        allowance[msg.sender][_spender] = _value;
+        /* AUDITOR NOTE:
+            Many dex and dapps pre-approve large amount of tokens to save gas for subsequent transaction. This is good use case.
+            On flip-side, some malicious dapp, may pre-approve large amount and then drain all token balance from user.
+            So following condition is kept in commented. It can be be kept that way or not based on client's consent.
+        */
+        //require(_balanceOf[msg.sender] >= _value, "Balance does not have enough tokens");
+        _allowance[msg.sender][_spender] = _value;
         emit Approval(msg.sender, _spender, _value);
+        return true;
+    }
+    
+    /**
+     * @dev Increase the amount of tokens that an owner allowed to a spender.
+     * approve should be called when allowed_[_spender] == 0. To increment
+     * allowed value is better to use this function to avoid 2 calls (and wait until
+     * the first transaction is mined)
+     * Emits an Approval event.
+     * @param spender The address which will spend the funds.
+     * @param value The amount of tokens to increase the allowance by.
+     */
+    function increase_allowance(address spender, uint256 value) public returns (bool) {
+        require(spender != address(0));
+        _allowance[msg.sender][spender] = _allowance[msg.sender][spender].add(value);
+        emit Approval(msg.sender, spender, _allowance[msg.sender][spender]);
+        return true;
+    }
+
+    /**
+     * @dev Decrease the amount of tokens that an owner allowed to a spender.
+     * approve should be called when allowed_[_spender] == 0. To decrement
+     * allowed value is better to use this function to avoid 2 calls (and wait until
+     * the first transaction is mined)
+     * Emits an Approval event.
+     * @param spender The address which will spend the funds.
+     * @param value The amount of tokens to decrease the allowance by.
+     */
+    function decrease_allowance(address spender, uint256 value) public returns (bool) {
+        require(spender != address(0));
+        _allowance[msg.sender][spender] = _allowance[msg.sender][spender].sub(value);
+        emit Approval(msg.sender, spender, _allowance[msg.sender][spender]);
         return true;
     }
 
@@ -242,10 +314,10 @@ contract EAToken is owned {
     
     constructor() public{
         //sending all the tokens to Owner
-        balanceOf[owner] = totalSupply;
+        _balanceOf[owner] = _totalSupply;
         
         //firing event which logs this transaction
-        emit Transfer(address(0), owner, totalSupply);
+        emit Transfer(address(0), owner, _totalSupply);
     }
     
     function () external payable {
@@ -262,8 +334,8 @@ contract EAToken is owned {
     function burn(uint256 _value) public returns (bool success) {
         require(!safeguard);
         //checking of enough token balance is done by SafeMath
-        balanceOf[msg.sender] = balanceOf[msg.sender].sub(_value);  // Subtract from the sender
-        totalSupply = totalSupply.sub(_value);                      // Updates totalSupply
+        _balanceOf[msg.sender] = _balanceOf[msg.sender].sub(_value);  // Subtract from the sender
+        _totalSupply = _totalSupply.sub(_value);                      // Updates totalSupply
         emit Burn(msg.sender, _value);
         emit Transfer(msg.sender, address(0), _value);
         return true;
@@ -280,9 +352,9 @@ contract EAToken is owned {
     function burnFrom(address _from, uint256 _value) public returns (bool success) {
         require(!safeguard);
         //checking of allowance and token value is done by SafeMath
-        balanceOf[_from] = balanceOf[_from].sub(_value);                         // Subtract from the targeted balance
-        allowance[_from][msg.sender] = allowance[_from][msg.sender].sub(_value); // Subtract from the sender's allowance
-        totalSupply = totalSupply.sub(_value);                                   // Update totalSupply
+        _balanceOf[_from] = _balanceOf[_from].sub(_value);                         // Subtract from the targeted balance
+        _allowance[_from][msg.sender] = _allowance[_from][msg.sender].sub(_value); // Subtract from the sender's allowance
+        _totalSupply = _totalSupply.sub(_value);                                   // Update totalSupply
         emit  Burn(_from, _value);
         emit Transfer(_from, address(0), _value);
         return true;
@@ -295,7 +367,7 @@ contract EAToken is owned {
         * @param freeze either to freeze it or not
         */
     function freezeAccount(address target, bool freeze) onlyOwner public {
-            frozenAccount[target] = freeze;
+        frozenAccount[target] = freeze;
         emit  FrozenAccounts(target, freeze);
     }
     
@@ -305,9 +377,9 @@ contract EAToken is owned {
         * @param mintedAmount the amount of tokens it will receive
         */
     function mintToken(address target, uint256 mintedAmount) onlyOwner public {
-        require(totalSupply.add(mintedAmount) <= maxSupply, "Cannot Mint more than maximum supply");
-        balanceOf[target] = balanceOf[target].add(mintedAmount);
-        totalSupply = totalSupply.add(mintedAmount);
+        require(_totalSupply.add(mintedAmount) <= maxSupply, "Cannot Mint more than maximum supply");
+        _balanceOf[target] = _balanceOf[target].add(mintedAmount);
+        _totalSupply = _totalSupply.add(mintedAmount);
         emit Transfer(address(0), target, mintedAmount);
     }
 
@@ -345,17 +417,7 @@ contract EAToken is owned {
         }
     }
     
-    /**
-     * This function allows enable admins to start or stop token swaps.
-     */
-    function changeTokenSwapStatus() public onlyOwner{
-        if (tokenSwap == false){
-            tokenSwap = true;
-        }
-        else{
-            tokenSwap = false;    
-        }
-    }
+
     
     /*************************************/
     /*    Section for User Air drop      */
@@ -534,7 +596,7 @@ contract EAToken is owned {
      * amount amount of tokens to be sold
      */
     function sellTokens(uint256 amount) public {
-        uint256 etherAmount = amount * sellPrice/(10**decimals);
+        uint256 etherAmount = amount * sellPrice/(10**_decimals);
         require(address(this).balance >= etherAmount);   // checks if the contract has enough ether to buy
         _transfer(msg.sender, address(this), amount);           // makes the transfers
         msg.sender.transfer(etherAmount);                // sends ether to the seller. It's important to do this last to avoid recursion attacks
