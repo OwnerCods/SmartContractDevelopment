@@ -19,7 +19,6 @@ __/__|____(___ _/___(___ _(___/_/_/__/_(___ _____/______(___/__o_o_
     => user whitelisting 
     => air drop (active and passive)
     => in-built buy/sell functions 
-    => Token swap functionality (implemented for the future use)
 
 
 ======================= Quick Stats ===================
