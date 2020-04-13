@@ -376,7 +376,7 @@ contract EasyDEX is owned {
       
       bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
      
-      return ecrecover(hash,v,r,s);
+      return ecrecover(keccak256(abi.encodePacked("\x19Ethereum Signed Message:\n32", hash)),v,r,s);
     
   }
 
