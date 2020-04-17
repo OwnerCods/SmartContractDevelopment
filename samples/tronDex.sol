@@ -1,4 +1,4 @@
-pragma solidity 0.5.13;  /*
+pragma solidity 0.5.8;  /*
  
  
  
@@ -329,7 +329,7 @@ contract EasyDEX is owned {
     require(!safeGuard,"System Paused by Admin");
     //amount is in amountGet terms
     bytes32 hash = keccak256(abi.encodePacked(address(this), addressArray[0], amountGet, addressArray[1], amountGive, expires));
-    require(orders[addressArray[2]][hash] || ecrecover(hash,v,r,s) == addressArray[2], 'Invalid trade parameters');
+    require(orders[addressArray[2]][hash] || ecrecover(keccak256(abi.encodePacked("\x19TRON Signed Message:\n32", hash)),v,r,s) == addressArray[2], 'Invalid trade parameters');
     require(block.number <= expires, 'Trade is expired');
     require(orderFills[addressArray[2]][hash].add(amount) <= amountGet, 'Trade order is filled');
 
@@ -371,20 +371,26 @@ contract EasyDEX is owned {
     )) return false;
     return true;
   }
-  
+
   function testVRS(address tokenGet, uint256 amountGet, address tokenGive, uint256 amountGive, uint256 expires, uint8 v, bytes32 r, bytes32 s ) public view returns(address){
       
       bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
      
-      return ecrecover(hash,v,r,s);
+      return ecrecover(keccak256(abi.encodePacked("\x19TRON Signed Message:\n32", hash)),v,r,s);
     
+  }
+
+
+  function getHash(address tokenGet, uint256 amountGet, address tokenGive, uint256 amountGive, uint256 expires) public view returns(bytes32){
+      
+      return keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
   }
 
   function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
     bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
     uint available1;
     if (!(
-      (orders[user][hash] || ecrecover(hash,v,r,s) == user) &&
+      (orders[user][hash] || ecrecover(keccak256(abi.encodePacked("\x19TRON Signed Message:\n32", hash)),v,r,s) == user) &&
       block.number <= expires
     )) return 0;
     available1 = tokens[tokenGive][user].mul(amountGet) / amountGive;
@@ -402,7 +408,7 @@ contract EasyDEX is owned {
   function cancelOrder(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, uint8 v, bytes32 r, bytes32 s) public {
     require(!safeGuard,"System Paused by Admin");
     bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
-    require(orders[msg.sender][hash] || ecrecover(hash,v,r,s) == msg.sender, 'Invalid trade order');
+    require(orders[msg.sender][hash] || ecrecover(keccak256(abi.encodePacked("\x19TRON Signed Message:\n32", hash)),v,r,s) == msg.sender, 'Invalid trade order');
     orderFills[msg.sender][hash] = amountGet;
     emit Cancel(now, tokenGet, amountGet, tokenGive, amountGive, expires, msg.sender, v, r, s);
   }
