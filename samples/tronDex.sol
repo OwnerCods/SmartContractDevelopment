@@ -11,22 +11,22 @@ pragma solidity 0.5.8;  /*
     __/__|____(___ _/___(___ _(___/_/_/__/_(___ _____/______(___/__o_o_
     
         
-       
-
-
-    ███████╗ █████╗ ███████╗██╗   ██╗    ██████╗ ███████╗██╗  ██╗    
-    ██╔════╝██╔══██╗██╔════╝╚██╗ ██╔╝    ██╔══██╗██╔════╝╚██╗██╔╝    
-    █████╗  ███████║███████╗ ╚████╔╝     ██║  ██║█████╗   ╚███╔╝     
-    ██╔══╝  ██╔══██║╚════██║  ╚██╔╝      ██║  ██║██╔══╝   ██╔██╗     
-    ███████╗██║  ██║███████║   ██║       ██████╔╝███████╗██╔╝ ██╗    
-    ╚══════╝╚═╝  ╚═╝╚══════╝   ╚═╝       ╚═════╝ ╚══════╝╚═╝  ╚═╝    
-                                                                 
-
+        
+            
+           
+    ████████╗██████╗  ██████╗ ███╗   ██╗    ██████╗ ███████╗██╗  ██╗
+    ╚══██╔══╝██╔══██╗██╔═══██╗████╗  ██║    ██╔══██╗██╔════╝╚██╗██╔╝
+       ██║   ██████╔╝██║   ██║██╔██╗ ██║    ██║  ██║█████╗   ╚███╔╝ 
+       ██║   ██╔══██╗██║   ██║██║╚██╗██║    ██║  ██║██╔══╝   ██╔██╗ 
+       ██║   ██║  ██║╚██████╔╝██║ ╚████║    ██████╔╝███████╗██╔╝ ██╗
+       ╚═╝   ╚═╝  ╚═╝ ╚═════╝ ╚═╝  ╚═══╝    ╚═════╝ ╚══════╝╚═╝  ╚═╝
+                                                                    
+    
 
                                                                                      
                                                                                      
 ------------------------------------------------------------------------------------------------------
- Copyright (c) 2019 Onwards Easy DEX Inc. ( https://xxxxxxxx.io )
+ Copyright (c) 2019 Onwards TRON DEX Inc. ( https://xxxxxxxx.io )
  Contract designed with ❤ by EtherAuthority  ( https://EtherAuthority.io )
 ------------------------------------------------------------------------------------------------------
 */
@@ -176,11 +176,12 @@ contract owned {
 
 
 
-contract EasyDEX is owned {
+contract TronDEX is owned {
   using SafeMath for uint256;
   bool public safeGuard; // To hault all non owner functions in case of imergency - by default false
   address public feeAccount; //the account that will receive fees
-  uint public tradingFee = 300; // 300 = 0.3%
+  uint32 public tradingFeeTradeMaker = 300; // 300 = 0.3%
+  uint32 public tradingFeeTradeTaker = 300; // 300 = 0.3%
   
   //referrals
   uint256 public refPercent = 10;  // percent to calculate referal bonous - by default 10% of trading fee
@@ -197,10 +198,14 @@ contract EasyDEX is owned {
   event Order(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires,  address user);
   event Cancel(uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s);
   event Trade( uint256 curTime, address tokenGet, uint amountGet, address tokenGive, uint amountGive, address get, address give, uint256 orderBookID);
-  event Deposit(uint256 curTime, address token, address user, uint amount, uint balance);
-  event Withdraw(uint256 curTime, address token, address user, uint amount, uint balance);
-  event OwnerWithdrawCommission(address indexed owner, address indexed tokenAddress, uint256 amount);
-  
+  event DepositTRC20(uint256 curTime, address token, address user, uint amount, uint balance);
+  event DepositTRC10(uint256 curTime, uint64 token, address user, uint amount, uint balance);
+  event DepositTRX(uint256 curTime, address user, uint amount, uint balance);
+  event WithdrawTRC20(uint256 curTime, address token, address user, uint amount, uint balance);
+  event WithdrawTRC10(uint256 curTime, uint64 token, address user, uint amount, uint balance);
+  event WithdrawTRX(uint256 curTime, address user, uint amount, uint balance);
+  event OwnerWithdrawCommissionTRC20(address indexed owner, address indexed tokenAddress, uint256 amount);
+  event OwnerWithdrawCommissionTRC10(address indexed owner, uint64 indexed tokenID, uint256 amount);
   // Events to track ether transfer to referrers
   event ReferrerBonus(address indexed referer, address indexed trader, uint256 referralBonus, uint256 timestamp );
   event ReferrerBonusWithdrawn(address indexed referrer, uint256 indexed amount);
@@ -243,73 +248,102 @@ contract EasyDEX is owned {
     feeAccount = feeAccount_;
   }
 
-  function changetradingFee(uint tradingFee_) public onlyOwner{
-    require(tradingFee_ <= 10000, 'trading fee can not be more than 100%');
-    tradingFee = tradingFee_;
+  function changetradingFee(uint32 tradingFeeTradeMaker_, uint32 tradingFeeTradeTaker_) public onlyOwner{
+    require(tradingFeeTradeMaker_ <= 10000 && tradingFeeTradeTaker_ <= 10000, 'trading fee can not be more than 100%');
+    tradingFeeTradeMaker = tradingFeeTradeMaker_;
+    tradingFeeTradeTaker = tradingFeeTradeTaker_;
   }
   
-  function availableOwnerCommissionEther() public view returns(uint256){
-      //assress 0x0 only holds ether as fee
-      return tokens[address(0)][feeAccount];
+  function availableOwnerCommissionTRC10(uint64 tokenID) public view returns(uint256){
+      //tokenID = 0 is for TRX
+      return tokens[address(tokenID)][feeAccount];
   }
   
-  function availableOwnerCommissionToken(address tokenAddress) public view returns(uint256){
+  function availableOwnerCommissionTRC20(address tokenAddress) public view returns(uint256){
       //assress 0x0 only holds ether as fee
       return tokens[tokenAddress][feeAccount];
   }
   
-  function withdrawOwnerCommissoinEther() public  returns (string memory){
+  //tokenID = 0 is for TRX 
+  function withdrawOwnerCommissoinTRC10(uint64 tokenID) public  returns (string memory){
       require(msg.sender == feeAccount, 'Invalid caller');
-      uint256 amount = availableOwnerCommissionEther();
+      uint256 amount = availableOwnerCommissionTRC10(tokenID);
       require (amount > 0, 'Nothing to withdraw');
-      tokens[address(0)][feeAccount] = 0;
-      msg.sender.transfer(amount);
-      emit OwnerWithdrawCommission(msg.sender, address(0), amount);
-      return "Ether withdrawn successfully";
+      tokens[address(tokenID)][feeAccount] = 0;
+      if(tokenID==0){
+        msg.sender.transfer(amount);
+      }
+      else{
+        msg.sender.transferToken(amount, tokenID);
+      }
+      
+      emit OwnerWithdrawCommissionTRC10(msg.sender, tokenID, amount);
+      return "TRC10 tokens withdrawn successfully";
   }
   
-  function withdrawOwnerCommissoinToken(address tokenAddress) public  returns (string memory){
+  function withdrawOwnerCommissoinTRC20(address tokenAddress) public  returns (string memory){
       require(msg.sender == feeAccount, 'Invalid caller');
-      uint256 amount = availableOwnerCommissionToken(tokenAddress);
+      uint256 amount = availableOwnerCommissionTRC20(tokenAddress);
       require (amount > 0, 'Nothing to withdraw');
       tokens[tokenAddress][feeAccount] = 0;
       ERC20Essential(tokenAddress).transfer(msg.sender, amount);
-      emit OwnerWithdrawCommission(msg.sender, tokenAddress, amount);
-      return "Token withdrawn successfully";
+      emit OwnerWithdrawCommissionTRC20(msg.sender, tokenAddress, amount);
+      return "TRC20 tokens withdrawn successfully";
   }
 
-  function deposit() public payable {
-    tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].add(msg.value);
-    emit Deposit(now, address(0), msg.sender, msg.value, tokens[address(0)][msg.sender]);
+  function depositTRX() public payable {
+      tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].add(msg.value);
+      emit DepositTRX(now, msg.sender, msg.value, tokens[address(0)][msg.sender]);
   }
 
-  function withdraw(uint amount) public {
-    require(!safeGuard,"System Paused by Admin");
-    require(tokens[address(0)][msg.sender] >= amount, 'Not enough balance');
-    tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].sub(amount);
-    msg.sender.transfer(amount);
-    emit Withdraw(now, address(0), msg.sender, amount, tokens[address(0)][msg.sender]);
+  function depositTRC10() public payable {
+    uint64 tokenID = uint64(msg.tokenid);
+    tokens[address(tokenID)][msg.sender] = tokens[address(tokenID)][msg.sender].add(msg.tokenvalue);
+    emit DepositTRC10(now, tokenID, msg.sender, msg.tokenvalue, tokens[address(tokenID)][msg.sender]);
+    
   }
 
-  function depositToken(address token, uint amount) public {
+  function depositTRC20(address token, uint amount) public {
     //remember to call Token(address).approve(address(this), amount) or this contract will not be able to do the transfer on your behalf.
     require(token!=address(0), 'Invalid token address');
     require(ERC20Essential(token).transferFrom(msg.sender, address(this), amount), 'tokens could not be transferred');
     tokens[token][msg.sender] = tokens[token][msg.sender].add(amount);
-    emit Deposit(now, token, msg.sender, amount, tokens[token][msg.sender]);
+    emit DepositTRC20(now, token, msg.sender, amount, tokens[token][msg.sender]);
   }
+
+  
+  function withdrawTRX(uint amount) public {
+    require(!safeGuard,"System Paused by Admin");
+    require(tokens[address(0)][msg.sender] >= amount, 'Not enough balance');
+    tokens[address(0)][msg.sender] = tokens[address(0)][msg.sender].sub(amount);
+    msg.sender.transfer(amount);
+    emit WithdrawTRX(now, msg.sender, amount, tokens[address(0)][msg.sender]);
+  }
+
+  function withdrawTRC10(uint64 tokenID, uint amount) public {
+    require(!safeGuard,"System Paused by Admin");
+    require(tokens[address(tokenID)][msg.sender] >= amount, 'Not enough balance');
+    tokens[address(tokenID)][msg.sender] = tokens[address(tokenID)][msg.sender].sub(amount);
+    msg.sender.transferToken(amount, tokenID);
+    emit WithdrawTRC10(now, tokenID, msg.sender, amount, tokens[address(tokenID)][msg.sender]);
+  }
+
 	
-  function withdrawToken(address token, uint amount) public {
+  function withdrawTRC20(address token, uint amount) public {
     require(!safeGuard,"System Paused by Admin");
     require(token!=address(0), 'Invalid token address');
     require(tokens[token][msg.sender] >= amount, 'not enough token balance');
     tokens[token][msg.sender] = tokens[token][msg.sender].sub(amount);
 	  ERC20Essential(token).transfer(msg.sender, amount);
-    emit Withdraw(now, token, msg.sender, amount, tokens[token][msg.sender]);
+    emit WithdrawTRC20(now, token, msg.sender, amount, tokens[token][msg.sender]);
   }
 
-  function balanceOf(address token, address user) public view returns (uint) {
+  function balanceOfTRC20(address token, address user) public view returns (uint) {
     return tokens[token][user];
+  }
+
+  function balanceOfTRC10(uint64 token, address user) public view returns (uint) {
+    return tokens[address(token)][user];
   }
 
   function order(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires) public {
@@ -338,6 +372,7 @@ contract EasyDEX is owned {
     
     emit Trade(now, addressArray[0], amount, addressArray[1], amountGive * amount / amountGet, addressArray[2], msg.sender, orderBookID);
   }
+  
     
     /**
         addressArray array elements
@@ -348,7 +383,7 @@ contract EasyDEX is owned {
     */
   function tradeBalances(address[4] memory addressArray, uint amountGet, uint amountGive, uint amount) internal {
     
-    uint tradingFeeXfer = calculatePercentage(amount,tradingFee);
+    uint tradingFeeXfer = calculatePercentage(amount,tradingFeeTradeMaker);
     
     //processing referrers bonus - which is % of the trading fee
     processReferrerBonus(addressArray[3], tradingFeeXfer);
@@ -386,6 +421,14 @@ contract EasyDEX is owned {
       return keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
   }
 
+  function addressToTokenId(address tokenAddress)  public pure returns(uint64){
+    return uint64(tokenAddress);
+  }
+
+  function tokenIdToAddress(uint tokenID) public pure returns(address){
+    return address(tokenID);
+  }
+
   function availableVolume(address tokenGet, uint amountGet, address tokenGive, uint amountGive, uint expires, address user, uint8 v, bytes32 r, bytes32 s) public view returns(uint) {
     bytes32 hash = keccak256(abi.encodePacked(address(this), tokenGet, amountGet, tokenGive, amountGive, expires));
     uint available1;
@@ -412,6 +455,8 @@ contract EasyDEX is owned {
     orderFills[msg.sender][hash] = amountGet;
     emit Cancel(now, tokenGet, amountGet, tokenGive, amountGive, expires, msg.sender, v, r, s);
   }
+
+  
 
 
 
